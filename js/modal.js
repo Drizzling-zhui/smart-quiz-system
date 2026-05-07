@@ -1,0 +1,93 @@
+// ============================================================
+// MODALS
+// ============================================================
+var editingQuestionId = null;
+
+function showModal(type, data) {
+  if (type === 'subject') {
+    document.getElementById('modal-subject-title').textContent = data ? '重命名学科' : '添加学科';
+    document.getElementById('subject-name-input').value = data || '';
+    document.getElementById('subject-name-input').dataset.edit = data || '';
+    document.getElementById('modal-subject').classList.add('active');
+    setTimeout(function () { document.getElementById('subject-name-input').focus(); }, 100);
+  } else if (type === 'question') {
+    editingQuestionId = null;
+    document.getElementById('modal-q-title').textContent = '添加题目';
+    document.getElementById('q-type-select').value = 'choice';
+    document.getElementById('q-text-input').value = '';
+    document.getElementById('q-answer-select').value = 'A';
+    document.getElementById('q-answer-text').value = '';
+    document.getElementById('q-score-input').value = '1';
+    document.getElementById('q-explain-input').value = '';
+    document.querySelectorAll('.opt-input').forEach(function (i) { i.value = ''; });
+    toggleQuestionModalOptions();
+    document.getElementById('modal-question').classList.add('active');
+  }
+}
+
+function hideModal(type) {
+  document.getElementById('modal-' + type).classList.remove('active');
+}
+
+function toggleQuestionModalOptions() {
+  var t = document.getElementById('q-type-select').value;
+  document.getElementById('q-options-field').style.display = t === 'choice' ? 'block' : 'none';
+  document.getElementById('q-answer-choice').style.display = t === 'choice' ? 'block' : 'none';
+  document.getElementById('q-answer-text').style.display = t !== 'choice' ? 'block' : 'none';
+  document.getElementById('q-answer-label').textContent = t === 'choice' ? '正确答案' : t === 'fill' ? '答案' : '参考答案';
+}
+
+function saveSubject() {
+  var input = document.getElementById('subject-name-input');
+  var name = input.value.trim();
+  var edit = input.dataset.edit;
+  if (!name) return toast('请输入学科名称', 'warning');
+  if (edit) renameSubject(edit, name); else addSubject(name);
+  hideModal('subject');
+}
+
+function saveQuestion() {
+  if (!currentSubject) return toast('请先选择学科', 'warning');
+  var type = document.getElementById('q-type-select').value;
+  var question = document.getElementById('q-text-input').value.trim();
+  if (!question) return toast('请输入题目内容', 'warning');
+  var score = parseFloat(document.getElementById('q-score-input').value) || 1;
+  var explanation = document.getElementById('q-explain-input').value.trim();
+  var options = [], answer = '';
+  if (type === 'choice') {
+    document.querySelectorAll('.opt-input').forEach(function (inp) {
+      if (inp.value.trim()) options.push({ label: String.fromCharCode(65 + parseInt(inp.dataset.idx)), text: inp.value.trim() });
+    });
+    if (options.length < 2) return toast('至少需要2个选项', 'warning');
+    answer = document.getElementById('q-answer-select').value;
+  } else {
+    answer = document.getElementById('q-answer-text').value.trim();
+    if (!answer) return toast('请输入答案', 'warning');
+  }
+  var qData = { type: type, question: question, options: options, answer: answer, score: score, explanation: explanation };
+  if (editingQuestionId) {
+    updateQuestion(currentSubject, editingQuestionId, qData);
+    toast('题目已更新', 'success');
+  } else {
+    addQuestion(currentSubject, qData);
+    toast('题目已添加', 'success');
+  }
+  hideModal('question');
+}
+
+function editQuestion(qId) {
+  var subj = getSubject(currentSubject); if (!subj) return;
+  var q = subj.questions.find(function (q) { return q.id === qId; }); if (!q) return;
+  editingQuestionId = qId;
+  document.getElementById('modal-q-title').textContent = '编辑题目';
+  document.getElementById('q-type-select').value = q.type;
+  document.getElementById('q-text-input').value = q.question;
+  document.getElementById('q-score-input').value = q.score || 1;
+  document.getElementById('q-explain-input').value = q.explanation || '';
+  if (q.type === 'choice' && q.options) {
+    document.querySelectorAll('.opt-input').forEach(function (inp, i) { inp.value = q.options[i] ? q.options[i].text : ''; });
+    document.getElementById('q-answer-select').value = q.answer || 'A';
+  } else { document.getElementById('q-answer-text').value = q.answer || ''; }
+  toggleQuestionModalOptions();
+  showModal('question');
+}

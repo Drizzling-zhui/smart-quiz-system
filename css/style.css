@@ -32,17 +32,35 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto
 .sidebar-actions button { flex: 1; padding: 6px 0; font-size: 12px; border: 1px dashed var(--gray-300); background: #fff; border-radius: 6px; cursor: pointer; color: var(--gray-600); transition: all .2s; }
 .sidebar-actions button:hover { border-color: var(--primary); color: var(--primary); background: var(--primary-light); }
 #subject-list { flex: 1; overflow-y: auto; padding: 6px; }
-.subject-item { padding: 9px 12px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all .15s; margin-bottom: 2px; }
-.subject-item:hover { background: var(--gray-100); }
-.subject-item.active { background: var(--primary-light); color: var(--primary); font-weight: 600; }
-.subject-item .name { font-size: 13px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.subject-item .count { font-size: 11px; color: var(--gray-400); background: var(--gray-100); padding: 1px 7px; border-radius: 10px; flex-shrink: 0; }
-.subject-item.active .count { background: var(--primary); color: #fff; }
-.subject-item .subj-actions { display: none; gap: 2px; flex-shrink: 0; }
-.subject-item:hover .subj-actions { display: flex; }
+
+/* Tree sidebar */
+.subject-group { margin-bottom: 2px; }
+.subject-header { display: flex; align-items: center; gap: 4px; padding: 8px 10px; border-radius: 8px; cursor: pointer; transition: background .15s; }
+.subject-header:hover { background: var(--gray-100); }
+.subject-header .subj-arrow { font-size: 10px; width: 14px; flex-shrink: 0; color: var(--gray-400); }
+.subject-header .subj-name { font-size: 13px; font-weight: 600; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.subject-header .subj-count { font-size: 11px; color: var(--gray-400); background: var(--gray-100); padding: 1px 7px; border-radius: 10px; flex-shrink: 0; }
+.subject-header .subj-actions { display: none; gap: 2px; flex-shrink: 0; }
+.subject-header:hover .subj-actions { display: flex; }
 .subj-actions button { border: none; background: none; cursor: pointer; font-size: 12px; padding: 2px 4px; border-radius: 4px; color: var(--gray-400); line-height: 1; }
 .subj-actions button:hover { background: var(--gray-200); color: var(--gray-700); }
 .subj-actions button.del:hover { color: var(--danger); }
+
+.tree-node { display: flex; align-items: center; gap: 3px; padding: 3px 8px; border-radius: 6px; cursor: pointer; transition: background .12s; margin: 1px 0; }
+.tree-node:hover { background: var(--gray-100); }
+.tree-node.active { background: var(--primary-light); }
+.tree-node.active .tree-name { color: var(--primary); font-weight: 600; }
+.tree-arrow { width: 14px; font-size: 9px; flex-shrink: 0; color: var(--gray-400); text-align: center; cursor: pointer; }
+.tree-icon { font-size: 13px; flex-shrink: 0; }
+.tree-name { font-size: 12px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--gray-700); }
+.tree-count { font-size: 10px; color: var(--gray-400); flex-shrink: 0; }
+.tree-actions { display: none; gap: 1px; flex-shrink: 0; }
+.tree-node:hover .tree-actions { display: flex; }
+.tree-actions button { border: none; background: none; cursor: pointer; font-size: 11px; padding: 1px 3px; border-radius: 3px; color: var(--gray-400); line-height: 1; }
+.tree-actions button:hover { background: var(--gray-200); color: var(--gray-700); }
+.tree-actions button.del:hover { color: var(--danger); }
+.tree-empty { font-size: 11px; color: var(--gray-400); padding: 6px 0 6px 18px; }
+
 .sidebar-footer { padding: 10px 14px; border-top: 1px solid var(--gray-200); }
 .sidebar-footer button { width: 100%; padding: 7px; border: none; background: var(--primary); color: #fff; border-radius: 8px; cursor: pointer; font-size: 13px; transition: all .2s; }
 .sidebar-footer button:hover { background: var(--primary-dark); }
@@ -107,6 +125,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto
 .q-card .q-footer button:hover { background: var(--gray-100); }
 .q-card .q-footer button.edit:hover { color: var(--primary); }
 .q-card .q-footer button.del:hover { color: var(--danger); }
+.q-card .q-footer button.ask-ai:hover { color: #7c3aed; }
 
 /* ===== Quiz Mode ===== */
 .quiz-setup { text-align: center; padding: 40px 20px; }
@@ -241,7 +260,32 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--gray-300); border-radius: 3px; }
-@media (max-width: 768px) { #sidebar { width: 180px; min-width: 180px; } #content { padding: 12px; } }
+/* ===== Chat Panel ===== */
+#chat-panel { width: 0; overflow: hidden; transition: width .3s; border-left: 1px solid var(--gray-200); background: #fff; display: flex; flex-direction: column; flex-shrink: 0; }
+#chat-panel.open { width: 350px; }
+#main { transition: margin-right .3s; }
+.chat-header { padding: 12px 16px; border-bottom: 1px solid var(--gray-200); display: flex; align-items: center; justify-content: space-between; }
+.chat-header h3 { font-size: 14px; display: flex; align-items: center; gap: 6px; }
+.chat-header .chat-actions { display: flex; gap: 4px; }
+.chat-header .chat-actions button { border: none; background: none; cursor: pointer; font-size: 12px; padding: 3px 8px; border-radius: 4px; color: var(--gray-400); }
+.chat-header .chat-actions button:hover { background: var(--gray-100); color: var(--gray-700); }
+#chat-context { padding: 6px 16px; background: var(--primary-light); border-bottom: 1px solid var(--gray-200); display: flex; align-items: center; gap: 4px; }
+.chat-messages { flex: 1; overflow-y: auto; padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; }
+.chat-msg { padding: 8px 12px; border-radius: 10px; font-size: 13px; line-height: 1.6; max-width: 90%; word-break: break-word; }
+.chat-msg.user { background: var(--primary-light); align-self: flex-end; }
+.chat-msg.assistant { background: var(--gray-100); align-self: flex-start; }
+.chat-input-area { padding: 10px 12px; border-top: 1px solid var(--gray-200); display: flex; gap: 6px; }
+.chat-input-area textarea { flex: 1; padding: 8px 10px; border: 1px solid var(--gray-300); border-radius: 8px; font-size: 13px; resize: none; min-height: 36px; max-height: 80px; font-family: inherit; }
+.chat-input-area textarea:focus { outline: none; border-color: var(--primary); }
+.chat-input-area button { padding: 6px 14px; border: none; background: var(--primary); color: #fff; border-radius: 8px; cursor: pointer; font-size: 13px; white-space: nowrap; }
+.chat-input-area button:hover { background: var(--primary-dark); }
+.chat-input-area button:disabled { opacity: .5; cursor: not-allowed; }
+
+/* Chat toggle button */
+#btn-toggle-chat { background: var(--gray-100); color: var(--gray-600); border: 1px solid var(--gray-200); padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; transition: all .2s; }
+#btn-toggle-chat:hover { border-color: var(--primary); color: var(--primary); background: var(--primary-light); }
+
+@media (max-width: 768px) { #sidebar { width: 180px; min-width: 180px; } #content { padding: 12px; } #chat-panel.open { width: 260px; } }
 
 /* Quiz type selector in setup */
 .qtype-checks { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
@@ -270,3 +314,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto
 .api-status { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; padding: 2px 8px; border-radius: 10px; }
 .api-status.ok { background: #f0fdf4; color: var(--success); }
 .api-status.no { background: #fef2f2; color: var(--danger); }
+
+/* Import picker tree */
+.ip-subject-header:hover { background: var(--gray-100); }
+.ip-tree-folder > div:first-child:hover { background: var(--gray-100); }
+.ip-tree-file { transition: background .12s; }
+.ip-tree-file:hover { background: var(--gray-100); }
+.ip-tree-file.active { background: var(--primary-light); color: var(--primary); font-weight: 600; }

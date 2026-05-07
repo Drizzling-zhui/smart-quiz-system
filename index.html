@@ -41,6 +41,7 @@
           <div class="actions">
             <button class="btn-primary" onclick="showModal('question')" id="btn-add-q" style="display:none">＋ 添加题目</button>
             <button class="btn-outline" onclick="resetAllStats()" id="btn-reset-stats" style="display:none">🔄 重置统计</button>
+            <button id="btn-toggle-chat" onclick="toggleChat()" style="display:none">💬 AI 对话</button>
           </div>
         </div>
         <div class="filter-bar" id="filter-bar" style="display:none">
@@ -66,7 +67,11 @@
             <div class="setup-form">
               <div class="field">
                 <label>选择学科</label>
-                <select id="quiz-subject-select" onchange="updateQuizSetup()"><option value="">— 暂无学科 —</option></select>
+                <select id="quiz-subject-select" onchange="renderQuizSetup()"><option value="">— 暂无学科 —</option></select>
+              </div>
+              <div class="field">
+                <label>选择题库</label>
+                <select id="quiz-node-select" onchange="updateQuizSetup()"><option value="">— 请选择题库 —</option></select>
               </div>
               <div class="field">
                 <label>题目类型</label>
@@ -151,6 +156,24 @@
   </div>
 </div>
 
+  <!-- Chat Panel -->
+  <div id="chat-panel">
+    <div class="chat-header">
+      <h3>💬 AI 助手</h3>
+      <div class="chat-actions">
+        <button onclick="clearChat()" title="清空对话">🗑️</button>
+        <button onclick="toggleChat()" title="关闭面板">✕</button>
+      </div>
+    </div>
+    <div id="chat-context" style="display:none"></div>
+    <div class="chat-messages" id="chat-messages"></div>
+    <div class="chat-input-area">
+      <textarea id="chat-input" placeholder="输入问题..." rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChatMessage();}"></textarea>
+      <button onclick="sendChatMessage()">发送</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modals -->
 <div class="modal-overlay" id="modal-subject">
   <div class="modal">
@@ -194,6 +217,22 @@
     <div class="modal-actions">
       <button class="btn-cancel" onclick="hideModal('question')">取消</button>
       <button class="btn-confirm" onclick="saveQuestion()">确定</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-import-picker">
+  <div class="modal" style="max-width:500px;max-height:75vh">
+    <h3>📥 选择导入目标题库</h3>
+    <p style="font-size:12px;color:var(--gray-500);margin-bottom:10px">点击选择一个题库文件，题目将导入到该文件中</p>
+    <div id="import-picker-tree" style="max-height:45vh;overflow-y:auto;border:1px solid var(--gray-200);border-radius:8px;padding:8px"></div>
+    <div style="margin-top:8px;display:flex;gap:4px">
+      <button onclick="importPickerNewSubject()" style="padding:4px 10px;font-size:11px;border:1px dashed var(--gray-300);background:#fff;border-radius:4px;cursor:pointer">＋ 新建学科</button>
+    </div>
+    <p id="import-picker-selected" style="font-size:12px;color:var(--primary);margin-top:6px;min-height:18px"></p>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="hideImportPicker()">取消</button>
+      <button class="btn-confirm" id="btn-import-confirm" onclick="confirmImportPicker()" disabled>确认导入</button>
     </div>
   </div>
 </div>
@@ -266,6 +305,7 @@
 <script src="js/parser.js"></script>
 <script src="js/import.js"></script>
 <script src="js/quiz.js"></script>
+<script src="js/chat.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

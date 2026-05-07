@@ -6,6 +6,21 @@ var chatState = {
   questionContext: null,
   loading: false
 };
+var chatWidth = 350;       // current panel width
+var chatMinWidth = 260;    // minimum width
+var chatMaxWidth = 700;    // maximum width
+var chatResizing = false;
+
+function loadChatWidth() {
+  try {
+    var saved = localStorage.getItem('quiz_app_chat_width');
+    if (saved) chatWidth = Math.max(chatMinWidth, Math.min(chatMaxWidth, parseInt(saved) || 350));
+  } catch (e) { chatWidth = 350; }
+}
+
+function saveChatWidth() {
+  try { localStorage.setItem('quiz_app_chat_width', String(chatWidth)); } catch (e) {}
+}
 
 function loadChatHistory() {
   try {
@@ -23,6 +38,7 @@ function openChat() {
   var panel = document.getElementById('chat-panel');
   if (panel.classList.contains('open')) return;
   panel.classList.add('open');
+  panel.style.width = chatWidth + 'px';
   if (currentNodeId) setChatContext();
   ensureWelcomeMessage();
   renderChatMessages();
@@ -30,7 +46,7 @@ function openChat() {
 
 function ensureWelcomeMessage() {
   if (!chatState.messages.length) {
-    chatState.messages.push({ role: 'assistant', content: '你好！我是AI助手，可以帮你解答当前题库中的题目。选择一道题点击"问AI"按钮，或者直接输入你的问题。' });
+    chatState.messages.push({ role: 'assistant', content: '你好！我是AI助手，可以帮你解答当前题库中的题目。选择一道题点击"问AI"按钮，或者直接输入你的问题。\n\n支持 **Markdown** 格式，AI 回复会以富文本显示。' });
   }
 }
 
@@ -38,11 +54,54 @@ function toggleChat() {
   var panel = document.getElementById('chat-panel');
   if (panel.classList.contains('open')) {
     panel.classList.remove('open');
+    panel.style.width = '';
     chatState.questionContext = null;
     document.getElementById('chat-context').style.display = 'none';
   } else {
     openChat();
   }
+}
+
+// ============================================================
+// RESIZE HANDLE
+// ============================================================
+function initChatResize() {
+  var panel = document.getElementById('chat-panel');
+  if (!panel) return;
+
+  // Create resize handle
+  var handle = document.createElement('div');
+  handle.className = 'chat-resize-handle';
+  handle.addEventListener('mousedown', function (e) {
+    e.preventDefault();
+    chatResizing = true;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    document.body.classList.add('resizing');
+  });
+  panel.appendChild(handle);
+
+  document.addEventListener('mousemove', function (e) {
+    if (!chatResizing) return;
+    // Calculate width: mouse X from the right edge of the viewport
+    var newWidth = window.innerWidth - e.clientX;
+    newWidth = Math.max(chatMinWidth, Math.min(chatMaxWidth, newWidth));
+    chatWidth = newWidth;
+    var p = document.getElementById('chat-panel');
+    if (p) p.style.width = chatWidth + 'px';
+  });
+
+  document.addEventListener('mouseup', function () {
+    if (!chatResizing) return;
+    chatResizing = false;
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+    document.body.classList.remove('resizing');
+    var p = document.getElementById('chat-panel');
+    if (p && p.classList.contains('open')) {
+      saveChatWidth();
+    }
+  });
 }
 
 function setChatContext(qId) {
@@ -113,7 +172,7 @@ function sendChatMessage(text) {
   renderChatMessages();
 
   var cfg = getApiConfig();
-  var msgs = [{ role: 'system', content: '你是一个专业的题目讲解助手。请用简洁清晰的中文回答，帮助学生理解题目涉及的知识点。如果题目有错误或歧义，请指出。' }];
+  var msgs = [{ role: 'system', content: '你是一个专业的题目讲解助手。请用简洁清晰的中文回答，帮助学生理解题目涉及的知识点。回答时可以使用 Markdown 格式来排版（标题、列表、加粗、代码块等），让回答结构清晰易读。' }];
 
   if (chatState.questionContext) {
     var q = chatState.questionContext;
@@ -161,10 +220,11 @@ function renderChatMessages() {
   var container = document.getElementById('chat-messages');
   var html = '';
   chatState.messages.forEach(function (msg) {
-    html += '<div class="chat-msg ' + msg.role + '">' + escHtml(msg.content).replace(/\n/g, '<br>') + '</div>';
+    var body = msg.role === 'assistant' ? renderMD(msg.content) : escHtml(msg.content).replace(/\n/g, '<br>');
+    html += '<div class="chat-msg ' + msg.role + '">' + body + '</div>';
   });
   if (chatState.loading) {
-    html += '<div class="chat-msg assistant" style="color:var(--gray-400)">思考中...</div>';
+    html += '<div class="chat-msg assistant"><span class="loading-dots">思考中<span>.</span><span>.</span><span>.</span></span></div>';
   }
   container.innerHTML = html;
   container.scrollTop = container.scrollHeight;
@@ -180,4 +240,6 @@ function clearChat() {
   renderChatMessages();
 }
 
+loadChatWidth();
 loadChatHistory();
+initChatResize();

@@ -16,7 +16,6 @@
       <p>JSON驱动 · 无限扩展</p>
     </div>
     <div class="sidebar-actions">
-      <button onclick="switchTab('import')">📥 导入</button>
       <button onclick="exportData()">📤 导出</button>
       <button onclick="showApiSettings()" title="API设置">⚙️</button>
     </div>
@@ -30,7 +29,6 @@
     <div id="topbar">
       <button class="tab-btn active" data-tab="browse" onclick="switchTab('browse')">📖 浏览题库</button>
       <button class="tab-btn" data-tab="quiz" onclick="switchTab('quiz')">✏️ 答题模式</button>
-      <button class="tab-btn" data-tab="import" onclick="switchTab('import')">📥 导入</button>
     </div>
 
     <div id="content">
@@ -118,40 +116,6 @@
         </div>
       </div>
 
-      <!-- Import View -->
-      <div class="view" id="view-import">
-        <div class="import-area">
-          <h2 style="font-size:17px;margin-bottom:10px">📥 导入题目数据</h2>
-          <div class="itabs">
-            <button class="itab active" data-itab="text" onclick="switchImportTab('text',this)">📄 文本解析</button>
-            <button class="itab" data-itab="json" onclick="switchImportTab('json',this)">📋 JSON导入</button>
-          </div>
-          <div class="tab-content active" id="itab-text">
-            <p style="font-size:12px;color:var(--gray-500);margin-bottom:6px">粘贴从学习平台复制的题目文本，自动解析为标准格式</p>
-            <textarea id="import-text" placeholder="在此粘贴题目文本..."></textarea>
-            <div class="import-actions">
-              <button class="btn-primary" onclick="parseTextImport()">🔍 解析预览</button>
-              <button class="btn-success" onclick="aiParseText()" id="btn-ai-parse" title="使用AI解析任意格式文本">🤖 AI 智能解析</button>
-              <button class="btn-outline" onclick="document.getElementById('import-text').value=''">清空</button>
-            </div>
-            <div id="import-preview-text"></div>
-          </div>
-          <div class="tab-content" id="itab-json">
-            <p style="font-size:12px;color:var(--gray-500);margin-bottom:6px">粘贴JSON数据，系统会自动修复不规范格式</p>
-            <textarea id="import-json" placeholder='{"subjects":[{"name":"学科名","questions":[...]}]}'></textarea>
-            <div class="import-actions">
-              <button class="btn-primary" onclick="importJSON()">📥 导入</button>
-              <button class="btn-outline" onclick="fixAndPreviewJSON()">🔧 修复预览</button>
-              <button class="btn-outline" onclick="document.getElementById('import-json').value=''">清空</button>
-            </div>
-            <div id="import-preview-json"></div>
-          </div>
-          <div class="import-help">
-            <strong>📖 格式说明</strong><br>
-            <code>{ "subjects": [{ "name": "学科", "questions": [{ "type":"choice|fill|short", "question":"题干", "options": [{"label":"A","text":"选项"}], "answer":"A", "score":1, "explanation":"解析" }] }] }</code>
-          </div>
-        </div>
-      </div>
     </div>
   </div>
 
@@ -186,55 +150,79 @@
 </div>
 
 <div class="modal-overlay" id="modal-question">
-  <div class="modal">
+  <div class="modal" style="max-width:580px">
     <h3 id="modal-q-title">添加题目</h3>
-    <div class="field">
-      <label>题目类型</label>
-      <select id="q-type-select" onchange="toggleQuestionModalOptions()">
-        <option value="choice">单选题</option>
-        <option value="fill">填空题</option>
-        <option value="short">简答题</option>
-      </select>
+    <div class="modal-tabs">
+      <button class="modal-tab active" data-mtab="single" onclick="switchModalTab('single',this)">✏️ 单次添加</button>
+      <button class="modal-tab" data-mtab="batch" onclick="switchModalTab('batch',this)">📥 批量导入</button>
     </div>
-    <div class="field"><label>题干</label><textarea id="q-text-input" rows="3" placeholder="输入题目内容..."></textarea></div>
-    <div class="field" id="q-options-field">
-      <label>选项</label>
-      <div class="options-editor" id="options-editor">
-        <div class="opt-row"><span class="opt-label">A</span><input type="text" class="opt-input" data-idx="0" placeholder="选项A内容"></div>
-        <div class="opt-row"><span class="opt-label">B</span><input type="text" class="opt-input" data-idx="1" placeholder="选项B内容"></div>
-        <div class="opt-row"><span class="opt-label">C</span><input type="text" class="opt-input" data-idx="2" placeholder="选项C内容"></div>
-        <div class="opt-row"><span class="opt-label">D</span><input type="text" class="opt-input" data-idx="3" placeholder="选项D内容"></div>
+    <div class="mtab-content active" id="mtab-single">
+      <div class="field">
+        <label>题目类型</label>
+        <select id="q-type-select" onchange="toggleQuestionModalOptions()">
+          <option value="choice">单选题</option>
+          <option value="fill">填空题</option>
+          <option value="short">简答题</option>
+        </select>
+      </div>
+      <div class="field"><label>题干</label><textarea id="q-text-input" rows="3" placeholder="输入题目内容..."></textarea></div>
+      <div class="field" id="q-options-field">
+        <label>选项</label>
+        <div class="options-editor" id="options-editor">
+          <div class="opt-row"><span class="opt-label">A</span><input type="text" class="opt-input" data-idx="0" placeholder="选项A内容"></div>
+          <div class="opt-row"><span class="opt-label">B</span><input type="text" class="opt-input" data-idx="1" placeholder="选项B内容"></div>
+          <div class="opt-row"><span class="opt-label">C</span><input type="text" class="opt-input" data-idx="2" placeholder="选项C内容"></div>
+          <div class="opt-row"><span class="opt-label">D</span><input type="text" class="opt-input" data-idx="3" placeholder="选项D内容"></div>
+        </div>
+      </div>
+      <div class="field">
+        <label id="q-answer-label">正确答案</label>
+        <div id="q-answer-choice"><select id="q-answer-select"><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option></select></div>
+        <textarea id="q-answer-text" style="display:none" rows="2" placeholder="输入答案内容..."></textarea>
+      </div>
+      <div class="field"><label>分值</label><input type="number" id="q-score-input" value="1" min="0" step="0.1"></div>
+      <div class="field"><label>解析（可选）</label><textarea id="q-explain-input" rows="2" placeholder="题目解析..."></textarea></div>
+      <div class="modal-actions">
+        <button class="btn-cancel" onclick="hideModal('question')">取消</button>
+        <button class="btn-confirm" onclick="saveQuestion()">确定</button>
       </div>
     </div>
-    <div class="field">
-      <label id="q-answer-label">正确答案</label>
-      <div id="q-answer-choice"><select id="q-answer-select"><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option></select></div>
-      <textarea id="q-answer-text" style="display:none" rows="2" placeholder="输入答案内容..."></textarea>
-    </div>
-    <div class="field"><label>分值</label><input type="number" id="q-score-input" value="1" min="0" step="0.1"></div>
-    <div class="field"><label>解析（可选）</label><textarea id="q-explain-input" rows="2" placeholder="题目解析..."></textarea></div>
-    <div class="modal-actions">
-      <button class="btn-cancel" onclick="hideModal('question')">取消</button>
-      <button class="btn-confirm" onclick="saveQuestion()">确定</button>
+    <div class="mtab-content" id="mtab-batch">
+      <div style="margin-bottom:8px">
+        <button class="modal-subtab active" data-mstab="text" onclick="switchModalSubTab('text',this)">📄 文本解析</button>
+        <button class="modal-subtab" data-mstab="json" onclick="switchModalSubTab('json',this)">📋 JSON导入</button>
+      </div>
+      <div class="mstab-content active" id="mstab-text">
+        <p style="font-size:12px;color:var(--gray-500);margin-bottom:6px">粘贴从学习平台复制的题目文本，自动解析为标准格式</p>
+        <textarea id="import-text" placeholder="在此粘贴题目文本..."></textarea>
+        <div class="import-actions">
+          <button class="btn-primary" onclick="parseTextImport()">🔍 解析预览</button>
+          <button class="btn-success" onclick="aiParseText()" id="btn-ai-parse" title="使用AI解析任意格式文本">🤖 AI 智能解析</button>
+          <button class="btn-outline" onclick="document.getElementById('import-text').value=''">清空</button>
+        </div>
+        <div id="import-preview-text"></div>
+      </div>
+      <div class="mstab-content" id="mstab-json">
+        <p style="font-size:12px;color:var(--gray-500);margin-bottom:6px">粘贴JSON数据，系统会自动修复不规范格式</p>
+        <textarea id="import-json" placeholder='{"subjects":[{"name":"学科名","questions":[...]}]}'></textarea>
+        <div class="import-actions">
+          <button class="btn-primary" onclick="importJSON()">📥 导入</button>
+          <button class="btn-outline" onclick="fixAndPreviewJSON()">🔧 修复预览</button>
+          <button class="btn-outline" onclick="document.getElementById('import-json').value=''">清空</button>
+        </div>
+        <div id="import-preview-json"></div>
+      </div>
+      <div class="import-help">
+        <strong>📖 格式说明</strong><br>
+        <code>{ "subjects": [{ "name": "学科", "questions": [{ "type":"choice|fill|short", "question":"题干", "options": [{"label":"A","text":"选项"}], "answer":"A", "score":1, "explanation":"解析" }] }] }</code>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-cancel" onclick="hideModal('question')">关闭</button>
+      </div>
     </div>
   </div>
 </div>
 
-<div class="modal-overlay" id="modal-import-picker">
-  <div class="modal" style="max-width:500px;max-height:75vh">
-    <h3>📥 选择导入目标题库</h3>
-    <p style="font-size:12px;color:var(--gray-500);margin-bottom:10px">点击选择一个题库文件，题目将导入到该文件中</p>
-    <div id="import-picker-tree" style="max-height:45vh;overflow-y:auto;border:1px solid var(--gray-200);border-radius:8px;padding:8px"></div>
-    <div style="margin-top:8px;display:flex;gap:4px">
-      <button onclick="importPickerNewSubject()" style="padding:4px 10px;font-size:11px;border:1px dashed var(--gray-300);background:#fff;border-radius:4px;cursor:pointer">＋ 新建学科</button>
-    </div>
-    <p id="import-picker-selected" style="font-size:12px;color:var(--primary);margin-top:6px;min-height:18px"></p>
-    <div class="modal-actions">
-      <button class="btn-cancel" onclick="hideImportPicker()">取消</button>
-      <button class="btn-confirm" id="btn-import-confirm" onclick="confirmImportPicker()" disabled>确认导入</button>
-    </div>
-  </div>
-</div>
 
 <div class="toast-container" id="toast-container"></div>
 

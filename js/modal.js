@@ -21,8 +21,24 @@ function showModal(type, data) {
     document.getElementById('q-explain-input').value = '';
     document.querySelectorAll('.opt-input').forEach(function (i) { i.value = ''; });
     toggleQuestionModalOptions();
+    // Reset to single-add tab
+    switchModalTab('single', document.querySelector('[data-mtab="single"]'));
     document.getElementById('modal-question').classList.add('active');
   }
+}
+
+function switchModalTab(tab, btn) {
+  document.querySelectorAll('.modal-tab').forEach(function (b) { b.classList.remove('active'); });
+  document.querySelectorAll('.mtab-content').forEach(function (c) { c.classList.remove('active'); });
+  if (btn) btn.classList.add('active');
+  document.getElementById('mtab-' + tab).classList.add('active');
+}
+
+function switchModalSubTab(tab, btn) {
+  document.querySelectorAll('.modal-subtab').forEach(function (b) { b.classList.remove('active'); });
+  document.querySelectorAll('.mstab-content').forEach(function (c) { c.classList.remove('active'); });
+  if (btn) btn.classList.add('active');
+  document.getElementById('mstab-' + tab).classList.add('active');
 }
 
 function hideModal(type) {

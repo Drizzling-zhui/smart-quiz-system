@@ -218,16 +218,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto
 .rv-item .rv-answer { font-size: 12px; color: var(--gray-600); }
 
 /* ===== Import ===== */
-.import-area { max-width: 860px; }
-.import-area .itabs { display: flex; gap: 0; margin-bottom: 0; border-bottom: 1px solid var(--gray-200); }
-.import-area .itabs .itab { padding: 8px 16px; border: none; background: none; cursor: pointer; font-size: 13px; color: var(--gray-500); border-bottom: 2px solid transparent; margin-bottom: -1px; }
-.import-area .itabs .itab.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 600; }
-.import-area .tab-content { display: none; padding: 12px 0; }
-.import-area .tab-content.active { display: block; }
-.import-area textarea { width: 100%; min-height: 260px; padding: 12px; border: 1px solid var(--gray-300); border-radius: 8px; font-family: "Consolas","Monaco","Courier New",monospace; font-size: 12px; line-height: 1.6; resize: vertical; }
-.import-area textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(79,110,247,.1); }
-.import-area .import-actions { display: flex; gap: 6px; margin-top: 10px; }
-.import-area .import-actions button { padding: 7px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 12px; }
+#import-text, #import-json { width: 100%; min-height: 200px; padding: 10px; border: 1px solid var(--gray-300); border-radius: 8px; font-family: "Consolas","Monaco","Courier New",monospace; font-size: 12px; line-height: 1.6; resize: vertical; }
+#import-text:focus, #import-json:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(79,110,247,.1); }
+.import-actions { display: flex; gap: 6px; margin-top: 10px; }
+.import-actions button { padding: 7px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 12px; }
 .import-help { margin-top: 12px; padding: 12px 16px; background: var(--gray-50); border-radius: 8px; border: 1px solid var(--gray-200); font-size: 12px; line-height: 1.6; color: var(--gray-600); }
 .import-help code { background: var(--gray-100); padding: 1px 5px; border-radius: 3px; font-size: 11px; }
 .preview-list .pv-item { background: #fff; border-radius: 6px; padding: 8px 12px; margin-bottom: 4px; border: 1px solid var(--gray-200); font-size: 12px; display: flex; align-items: center; gap: 8px; }
@@ -253,6 +247,20 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto
 .modal .modal-actions .btn-cancel:hover { background: var(--gray-200); }
 .modal .modal-actions .btn-confirm { background: var(--primary); color: #fff; }
 .modal .modal-actions .btn-confirm:hover { background: var(--primary-dark); }
+
+/* Modal Tabs */
+.modal-tabs { display: flex; gap: 4px; margin-bottom: 14px; border-bottom: 2px solid var(--gray-200); padding-bottom: 0; }
+.modal-tab { flex: 1; padding: 8px 0; border: none; background: none; font-size: 13px; cursor: pointer; color: var(--gray-500); border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all .15s; }
+.modal-tab:hover { color: var(--gray-700); }
+.modal-tab.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 600; }
+.mtab-content { display: none; }
+.mtab-content.active { display: block; }
+
+.modal-subtab { padding: 4px 12px; border: 1px solid var(--gray-200); background: #fff; font-size: 12px; cursor: pointer; color: var(--gray-500); border-radius: 4px; margin-right: 4px; transition: all .15s; }
+.modal-subtab:hover { border-color: var(--primary); color: var(--primary); }
+.modal-subtab.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+.mstab-content { display: none; }
+.mstab-content.active { display: block; padding-top: 10px; }
 
 /* Toast */
 .toast-container { position: fixed; top: 16px; right: 16px; z-index: 2000; display: flex; flex-direction: column; gap: 6px; }

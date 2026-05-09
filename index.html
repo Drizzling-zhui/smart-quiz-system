@@ -45,6 +45,8 @@
         <div class="filter-bar" id="filter-bar" style="display:none">
           <button class="filter-btn active" data-filter="all" onclick="filterQuestions('all',this)">全部</button>
           <button class="filter-btn" data-filter="choice" onclick="filterQuestions('choice',this)">单选题</button>
+          <button class="filter-btn" data-filter="multi" onclick="filterQuestions('multi',this)">多选题</button>
+          <button class="filter-btn" data-filter="judge" onclick="filterQuestions('judge',this)">判断题</button>
           <button class="filter-btn" data-filter="fill" onclick="filterQuestions('fill',this)">填空题</button>
           <button class="filter-btn" data-filter="short" onclick="filterQuestions('short',this)">简答题</button>
           <span class="stat-info" id="stat-info"></span>
@@ -76,6 +78,8 @@
                 <div class="qtype-checks" id="qtype-checks">
                   <span class="qtc active" data-qt="all" onclick="toggleQuizType('all',this)">全部</span>
                   <span class="qtc active" data-qt="choice" onclick="toggleQuizType('choice',this)">单选题</span>
+                  <span class="qtc active" data-qt="multi" onclick="toggleQuizType('multi',this)">多选题</span>
+                  <span class="qtc active" data-qt="judge" onclick="toggleQuizType('judge',this)">判断题</span>
                   <span class="qtc active" data-qt="fill" onclick="toggleQuizType('fill',this)">填空题</span>
                   <span class="qtc active" data-qt="short" onclick="toggleQuizType('short',this)">简答题</span>
                 </div>
@@ -157,6 +161,8 @@
         <label>题目类型</label>
         <select id="q-type-select" onchange="toggleQuestionModalOptions()">
           <option value="choice">单选题</option>
+          <option value="multi">多选题</option>
+          <option value="judge">判断题</option>
           <option value="fill">填空题</option>
           <option value="short">简答题</option>
         </select>
@@ -174,6 +180,16 @@
       <div class="field">
         <label id="q-answer-label">正确答案</label>
         <div id="q-answer-choice"><select id="q-answer-select"><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option></select></div>
+        <div id="q-answer-multi" style="display:none">
+          <label style="font-size:11px;color:var(--gray-500);font-weight:400;margin-bottom:4px">选择所有正确答案：</label>
+          <label style="display:block;margin:2px 0;font-size:13px"><input type="checkbox" value="A" class="multi-ans"> A</label>
+          <label style="display:block;margin:2px 0;font-size:13px"><input type="checkbox" value="B" class="multi-ans"> B</label>
+          <label style="display:block;margin:2px 0;font-size:13px"><input type="checkbox" value="C" class="multi-ans"> C</label>
+          <label style="display:block;margin:2px 0;font-size:13px"><input type="checkbox" value="D" class="multi-ans"> D</label>
+        </div>
+        <div id="q-answer-judge" style="display:none">
+          <select id="q-answer-judge-select"><option value="正确">正确 ✅</option><option value="错误">错误 ❌</option></select>
+        </div>
         <textarea id="q-answer-text" style="display:none" rows="2" placeholder="输入答案内容..."></textarea>
       </div>
       <div class="field"><label>解析（可选）</label><textarea id="q-explain-input" rows="2" placeholder="题目解析..."></textarea></div>
@@ -209,7 +225,7 @@
       </div>
       <div class="import-help">
         <strong>📖 格式说明</strong><br>
-        <code>{ "subjects": [{ "name": "学科", "questions": [{ "type":"choice|fill|short", "question":"题干", "options": [{"label":"A","text":"选项"}], "answer":"A", "explanation":"解析" }] }] }</code>
+        <code>{ "subjects": [{ "name": "学科", "questions": [{ "type":"choice|multi|judge|fill|short", "question":"题干", "options": [{"label":"A","text":"选项"}], "answer":"A", "explanation":"解析" }] }] }</code>
       </div>
       <div class="modal-actions">
         <button class="btn-cancel" onclick="hideModal('question')">关闭</button>

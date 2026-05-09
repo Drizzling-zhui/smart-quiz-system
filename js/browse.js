@@ -89,7 +89,7 @@ function renderBrowse() {
   }
 
   list.innerHTML = filtered.map(function (q, idx) {
-    var tm = { choice: '单选题', fill: '填空题', short: '简答题' };
+    var tm = { choice: '单选题', multi: '多选题', judge: '判断题', fill: '填空题', short: '简答题' };
     var isFav = isFavorite(q.id);
     var optsHtml = q.type === 'choice' && q.options ? q.options.map(function (o) {
       return '<div class="opt">' + o.label + '. ' + escHtml(o.text) + '</div>';

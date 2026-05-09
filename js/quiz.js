@@ -8,7 +8,7 @@ var quizState = {
   submitted: [],
   started: false
 };
-var quizTypeFilter = new Set(['all', 'choice', 'fill', 'short']);
+var quizTypeFilter = new Set(['all', 'choice', 'multi', 'judge', 'fill', 'short']);
 
 function updateQuizSetup() {
   var subjName = document.getElementById('quiz-subject-select').value;
@@ -51,15 +51,16 @@ function buildQuizNodeSelect(subj) {
 }
 
 function toggleQuizType(type, el) {
+  var allTypes = ['choice', 'multi', 'judge', 'fill', 'short'];
   if (type === 'all') {
     var allActive = el.classList.contains('active');
     if (allActive) {
       el.classList.remove('active');
       document.querySelectorAll('.qtc[data-qt!="all"]').forEach(function (b) { b.classList.add('active'); });
-      quizTypeFilter = new Set(['choice', 'fill', 'short']);
+      quizTypeFilter = new Set(allTypes);
     } else {
       document.querySelectorAll('.qtc').forEach(function (b) { b.classList.add('active'); });
-      quizTypeFilter = new Set(['all', 'choice', 'fill', 'short']);
+      quizTypeFilter = new Set(['all'].concat(allTypes));
     }
   } else {
     el.classList.toggle('active');
@@ -68,9 +69,9 @@ function toggleQuizType(type, el) {
     document.querySelectorAll('.qtc[data-qt!="all"]').forEach(function (b) {
       if (b.classList.contains('active')) activeTypes.add(b.dataset.qt);
     });
-    if (activeTypes.size === 3) {
+    if (activeTypes.size === allTypes.length) {
       allEl.classList.add('active');
-      quizTypeFilter = new Set(['all', 'choice', 'fill', 'short']);
+      quizTypeFilter = new Set(['all'].concat(allTypes));
     } else {
       allEl.classList.remove('active');
       quizTypeFilter = activeTypes;
@@ -102,7 +103,7 @@ function renderQuizSetup() {
 
   if (quizTypeFilter.size === 0 || quizTypeFilter.has('all')) {
     document.querySelectorAll('.qtc').forEach(function (b) { b.classList.add('active'); });
-    quizTypeFilter = new Set(['all', 'choice', 'fill', 'short']);
+    quizTypeFilter = new Set(['all', 'choice', 'multi', 'judge', 'fill', 'short']);
   }
   updateQuizSetup();
 }
@@ -172,7 +173,7 @@ function renderQuizQuestion() {
   document.getElementById('quiz-progress-info').textContent = '第 ' + (currentIdx + 1) + '/' + total + ' 题 · 已答 ' + answered + ' 题';
 
   var card = document.getElementById('quiz-question-card');
-  var typeMap = { choice: '单选题', fill: '填空题', short: '简答题' };
+  var typeMap = { choice: '单选题', multi: '多选题', judge: '判断题', fill: '填空题', short: '简答题' };
 
   var answerHtml = '';
   if (q.type === 'choice') {
@@ -190,6 +191,37 @@ function renderQuizQuestion() {
       '</div>';
     }).join('');
     answerHtml = '<div class="quiz-options">' + optionsHtml + '</div>';
+  } else if (q.type === 'multi') {
+    var optionsHtml = q.options.map(function (o) {
+      var cls = 'quiz-option';
+      var userAnswers = sub ? (sub.userAnswer || '').split('') : [];
+      if (isSubmitted) {
+        cls += ' disabled';
+        if ((q.answer || '').indexOf(o.label) !== -1) cls += ' reveal-correct';
+        else if (userAnswers.indexOf(o.label) !== -1) cls += ' wrong';
+      } else {
+        if (userAnswers.indexOf(o.label) !== -1) cls += ' selected';
+      }
+      return '<div class="' + cls + '" onclick="' + (isSubmitted ? '' : "toggleMultiOption('" + o.label + "')") + '">' +
+        '<span class="opt-label">' + o.label + '</span>' + escHtml(o.text) +
+      '</div>';
+    }).join('');
+    answerHtml = '<div class="quiz-options">' + optionsHtml + '</div>';
+  } else if (q.type === 'judge') {
+    var userJudge = sub ? sub.userAnswer : '';
+    var correctBtn = 'quiz-option';
+    var wrongBtn = 'quiz-option';
+    if (isSubmitted) {
+      correctBtn += ' disabled' + (q.answer === '正确' ? ' reveal-correct' : (userJudge === '正确' ? ' wrong' : ''));
+      wrongBtn += ' disabled' + (q.answer === '错误' ? ' reveal-correct' : (userJudge === '错误' ? ' wrong' : ''));
+    } else {
+      if (userJudge === '正确') correctBtn += ' selected';
+      if (userJudge === '错误') wrongBtn += ' selected';
+    }
+    answerHtml = '<div class="quiz-options">' +
+      '<div class="' + correctBtn + '" onclick="' + (isSubmitted ? '' : "selectQuizOption('正确')") + '"><span class="opt-label">✅</span>正确</div>' +
+      '<div class="' + wrongBtn + '" onclick="' + (isSubmitted ? '' : "selectQuizOption('错误')") + '"><span class="opt-label">❌</span>错误</div>' +
+    '</div>';
   } else if (q.type === 'fill') {
     var val = sub ? sub.userAnswer : '';
     var cls = 'quiz-fill-input' + (isSubmitted ? (sub.correct ? ' correct submitted' : ' wrong submitted') : '');
@@ -248,6 +280,24 @@ function renderQuizQuestion() {
   }
 }
 
+function toggleMultiOption(label) {
+  var q = quizState.questions[quizState.currentIdx];
+  if (!q) return;
+  var sub = quizState.submitted.find(function (s) { return s.qId === q.id && s.attempts > 0; });
+  if (sub) return;
+  var idx = quizState.submitted.findIndex(function (s) { return s.qId === q.id; });
+  var current = '';
+  if (idx >= 0) current = quizState.submitted[idx].userAnswer || '';
+  if (idx >= 0) quizState.submitted.splice(idx, 1);
+  if (current.indexOf(label) !== -1) {
+    current = current.replace(label, '');
+  } else {
+    current = (current + label).split('').sort().join('');
+  }
+  quizState.submitted.push({ qId: q.id, userAnswer: current, correct: false, attempts: 0 });
+  renderQuizQuestion();
+}
+
 function selectQuizOption(label) {
   var q = quizState.questions[quizState.currentIdx];
   if (!q) return;
@@ -278,8 +328,12 @@ function submitQuizAnswer() {
   q.stats.attempts++;
 
   var correct = false;
-  if (q.type === 'choice') {
+  if (q.type === 'choice' || q.type === 'judge') {
     correct = sub.userAnswer === q.answer;
+  } else if (q.type === 'multi') {
+    var userSorted = (sub.userAnswer || '').split('').sort().join('');
+    var ansSorted = (q.answer || '').split('').sort().join('');
+    correct = userSorted === ansSorted;
   } else if (q.type === 'fill') {
     correct = sub.userAnswer.trim().toLowerCase() === q.answer.trim().toLowerCase();
   } else {
@@ -349,7 +403,7 @@ function finishQuiz() {
     var color = isCorrect ? 'var(--success)' : isWrong ? 'var(--danger)' : 'var(--gray-400)';
     var icon = isCorrect ? '✅' : isWrong ? '❌' : '⚪';
     var ua = s ? s.userAnswer : '未作答';
-    var tm = { choice: '单选题', fill: '填空题', short: '简答题' };
+    var tm = { choice: '单选题', multi: '多选题', judge: '判断题', fill: '填空题', short: '简答题' };
     var att = s ? s.attempts : 0;
     return '<div class="rv-item" style="border-left-color:' + color + '">' +
       '<div class="rv-header">' +
@@ -358,9 +412,9 @@ function finishQuiz() {
       '</div>' +
       '<div class="rv-question">' + (i + 1) + '. ' + escHtml(q.question) + '</div>' +
       '<div class="rv-answer">' +
-        (q.type === 'choice'
-          ? '你的答案：<span style="' + (isCorrect ? 'color:var(--success)' : isWrong ? 'color:var(--danger);text-decoration:line-through' : 'color:var(--gray-400)') + '">' + escHtml(ua) + '</span> · 正确答案：<span style="color:var(--success);font-weight:600">' + escHtml(q.answer) + '</span>'
-          : '你的答案：<span style="' + (isCorrect ? 'color:var(--success)' : isWrong ? 'color:var(--danger);text-decoration:line-through' : 'color:var(--gray-400)') + '">' + escHtml(ua) + '</span> · 参考答案：<span style="color:var(--success);font-weight:600">' + escHtml(q.answer) + '</span>'
+        ((q.type === 'choice' || q.type === 'multi' || q.type === 'judge')
+          ? '你的答案：<span style="' + (isCorrect ? 'color:var(--success)' : isWrong ? 'color:var(--danger);text-decoration:line-through' : 'color:var(--gray-400)') + '">' + escHtml(ua || '未作答') + '</span> · 正确答案：<span style="color:var(--success);font-weight:600">' + escHtml(q.answer) + '</span>'
+          : '你的答案：<span style="' + (isCorrect ? 'color:var(--success)' : isWrong ? 'color:var(--danger);text-decoration:line-through' : 'color:var(--gray-400)') + '">' + escHtml(ua || '未作答') + '</span> · 参考答案：<span style="color:var(--success);font-weight:600">' + escHtml(q.answer) + '</span>'
         ) +
         (q.explanation ? '<br>💡 ' + escHtml(q.explanation) : '') +
         (att > 1 ? '<br><span class="rv-attempts">提交了 ' + att + ' 次</span>' : '') +

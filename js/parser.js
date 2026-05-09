@@ -9,7 +9,9 @@ function parseQuizText(text) {
 
   for (; i < lines.length; i++) {
     if (/^[一二三四五六七八九十]+\.\s*(单选|多选|填空|判断|简答|名词解释|论述)/.test(lines[i])) {
-      if (/填空/.test(lines[i])) currentType = 'fill';
+      if (/多选/.test(lines[i])) currentType = 'multi';
+      else if (/填空/.test(lines[i])) currentType = 'fill';
+      else if (/判断/.test(lines[i])) currentType = 'judge';
       else if (/简答|名词解释|论述/.test(lines[i])) currentType = 'short';
       else currentType = 'choice';
       i++; break;
@@ -27,7 +29,9 @@ function parseQuizText(text) {
       currentQ = { id: Date.now() + questions.length, type: currentType, question: '', options: [], answer: '', explanation: '', stats: { attempts: 0, correct: 0, wrong: 0 } };
       questionTextLines = [];
       if (qNumMatch[2]) {
-        if (qNumMatch[2].includes('填空')) currentQ.type = 'fill';
+        if (qNumMatch[2].includes('多选')) currentQ.type = 'multi';
+        else if (qNumMatch[2].includes('填空')) currentQ.type = 'fill';
+        else if (qNumMatch[2].includes('判断')) currentQ.type = 'judge';
         else if (qNumMatch[2].includes('简答') || qNumMatch[2].includes('名词解释') || qNumMatch[2].includes('论述')) currentQ.type = 'short';
         else currentQ.type = 'choice';
         currentType = currentQ.type;
@@ -107,7 +111,8 @@ function parseTextImport() {
       '<button class="btn-outline btn-sm" style="margin-left:4px" onclick="document.getElementById(\'import-preview-text\').innerHTML=\'\'">取消</button>' +
     '</div>' +
     '<div class="preview-list">' + result.questions.map(function (q, i) {
-      var typeLabel = q.type === 'choice' ? '单选' : q.type === 'fill' ? '填空' : '简答';
+      var typeMap = { choice: '单选', multi: '多选', judge: '判断', fill: '填空', short: '简答' };
+      var typeLabel = typeMap[q.type] || q.type;
       var qText = (q.question || '').slice(0, 50);
       if ((q.question || '').length > 50) qText += '...';
       return '<div class="pv-item"><span class="status">✅</span> #' + (i + 1) + ' [' + typeLabel + '] ' + escHtml(qText) + '</div>';
@@ -143,7 +148,7 @@ function aiParseText() {
   var btn = document.getElementById('btn-ai-parse');
   btn.textContent = '⏳ AI解析中...'; btn.disabled = true;
   var cfg = getApiConfig();
-  var prompt = '你是一个题目解析助手。请从以下文本中提取所有题目，以JSON数组格式返回，不要包含其他文字。\n\n每个题目格式：\n{\n  "type": "choice" | "fill" | "short",\n  "question": "题干",\n  "options": [{"label":"A","text":"选项内容"}],\n  "answer": "正确答案",\n  "explanation": "解析内容"\n}\n\n规则：\n- 选择题type为choice，填空题type为fill，简答题type为short\n- 选择题必须提取选项(A/B/C/D)\n- 提取正确答案，选择题提取字母选项\n- 忽略页眉页脚和无关信息\n- 解析内容可能为空\n\n文本内容：\n' + text;
+  var prompt = '你是一个题目解析助手。请从以下文本中提取所有题目，以JSON数组格式返回，不要包含其他文字。\n\n每个题目格式：\n{\n  "type": "choice" | "multi" | "judge" | "fill" | "short",\n  "question": "题干",\n  "options": [{"label":"A","text":"选项内容"}],\n  "answer": "正确答案",\n  "explanation": "解析内容"\n}\n\n规则：\n- 单选题type为choice，多选题type为multi，判断题type为judge，填空题type为fill，简答题type为short\n- 选择题(choice/multi)必须提取选项(A/B/C/D)\n- 单选题答案为一个字母(A/B/C/D)，多选题答案为多个字母连写(如"ABD")\n- 判断题答案为"正确"或"错误"\n- 填空题答案为关键词语\n- 忽略页眉页脚和无关信息\n- 解析内容可能为空\n\n文本内容：\n' + text;
 
   fetch(cfg.endpoint, {
     method: 'POST',
@@ -180,7 +185,8 @@ function aiParseText() {
     previewHtml += '<button class="btn-outline btn-sm" style="margin-left:4px" onclick="document.getElementById(\'import-preview-text\').innerHTML=\'\'">取消</button>';
     previewHtml += '</div><div class="preview-list">';
     questions.forEach(function (q, i) {
-      var typeLabel = q.type === 'choice' ? '单选' : (q.type === 'fill' ? '填空' : '简答');
+      var typeMap2 = { choice: '单选', multi: '多选', judge: '判断', fill: '填空', short: '简答' };
+      var typeLabel = typeMap2[q.type] || q.type;
       var qText = (q.question || '').slice(0, 50);
       if ((q.question || '').length > 50) qText += '...';
       previewHtml += '<div class="pv-item"><span class="status">✅</span> #' + (i + 1) + ' [' + typeLabel + '] ' + escHtml(qText) + '</div>';

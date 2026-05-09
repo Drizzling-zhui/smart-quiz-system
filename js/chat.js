@@ -149,7 +149,7 @@ function askAIAboutQuestion(qId) {
   var q = findQuestionById(qId);
   if (!q) return toast('题目未找到', 'error');
   setChatContext(qId);
-  var typeMap = { choice: '单选题', fill: '填空题', short: '简答题' };
+  var typeMap = { choice: '单选题', multi: '多选题', judge: '判断题', fill: '填空题', short: '简答题' };
   var prompt = '请帮我讲解这道' + typeMap[q.type] + '：\n\n题目：' + q.question + '\n';
   if (q.type === 'choice' && q.options) {
     prompt += '选项：\n' + q.options.map(function (o) { return o.label + '. ' + o.text; }).join('\n') + '\n';
@@ -176,7 +176,7 @@ function sendChatMessage(text) {
 
   if (chatState.questionContext) {
     var q = chatState.questionContext;
-    var typeMap = { choice: '单选题', fill: '填空题', short: '简答题' };
+    var typeMap = { choice: '单选题', multi: '多选题', judge: '判断题', fill: '填空题', short: '简答题' };
     var ctx = '当前讨论的题目：\n类型：' + typeMap[q.type] + '\n题干：' + q.question + '\n';
     if (q.options && q.options.length) ctx += '选项：' + q.options.map(function (o) { return o.label + '. ' + o.text; }).join('；') + '\n';
     ctx += '正确答案：' + q.answer;

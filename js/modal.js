@@ -10,7 +10,9 @@ function showModal(type, data) {
     document.getElementById('q-type-select').value = 'choice';
     document.getElementById('q-text-input').value = '';
     document.getElementById('q-answer-select').value = 'A';
+    document.getElementById('q-answer-judge-select').value = '正确';
     document.getElementById('q-answer-text').value = '';
+    document.querySelectorAll('.multi-ans').forEach(function (cb) { cb.checked = false; });
     document.getElementById('q-explain-input').value = '';
     document.querySelectorAll('.opt-input').forEach(function (i) { i.value = ''; });
     toggleQuestionModalOptions();
@@ -69,10 +71,14 @@ function hideModal(type) {
 
 function toggleQuestionModalOptions() {
   var t = document.getElementById('q-type-select').value;
-  document.getElementById('q-options-field').style.display = t === 'choice' ? 'block' : 'none';
+  var showOpts = t === 'choice' || t === 'multi';
+  document.getElementById('q-options-field').style.display = showOpts ? 'block' : 'none';
   document.getElementById('q-answer-choice').style.display = t === 'choice' ? 'block' : 'none';
-  document.getElementById('q-answer-text').style.display = t !== 'choice' ? 'block' : 'none';
-  document.getElementById('q-answer-label').textContent = t === 'choice' ? '正确答案' : t === 'fill' ? '答案' : '参考答案';
+  document.getElementById('q-answer-multi').style.display = t === 'multi' ? 'block' : 'none';
+  document.getElementById('q-answer-judge').style.display = t === 'judge' ? 'block' : 'none';
+  document.getElementById('q-answer-text').style.display = (t === 'fill' || t === 'short') ? 'block' : 'none';
+  var labelMap = { choice: '正确答案', multi: '正确答案（可多选）', judge: '判断结果', fill: '答案', short: '参考答案' };
+  document.getElementById('q-answer-label').textContent = labelMap[t] || '答案';
 }
 
 function saveQuestion() {
@@ -83,12 +89,21 @@ function saveQuestion() {
   if (!question) return toast('请输入题目内容', 'warning');
   var explanation = document.getElementById('q-explain-input').value.trim();
   var options = [], answer = '';
-  if (type === 'choice') {
+  if (type === 'choice' || type === 'multi') {
     document.querySelectorAll('.opt-input').forEach(function (inp) {
       if (inp.value.trim()) options.push({ label: String.fromCharCode(65 + parseInt(inp.dataset.idx)), text: inp.value.trim() });
     });
     if (options.length < 2) return toast('至少需要2个选项', 'warning');
-    answer = document.getElementById('q-answer-select').value;
+    if (type === 'multi') {
+      var checked = [];
+      document.querySelectorAll('.multi-ans:checked').forEach(function (cb) { checked.push(cb.value); });
+      if (!checked.length) return toast('请至少选择一个正确答案', 'warning');
+      answer = checked.sort().join('');
+    } else {
+      answer = document.getElementById('q-answer-select').value;
+    }
+  } else if (type === 'judge') {
+    answer = document.getElementById('q-answer-judge-select').value;
   } else {
     answer = document.getElementById('q-answer-text').value.trim();
     if (!answer) return toast('请输入答案', 'warning');
@@ -125,9 +140,15 @@ function editQuestion(qId) {
   document.getElementById('q-type-select').value = q.type;
   document.getElementById('q-text-input').value = q.question;
   document.getElementById('q-explain-input').value = q.explanation || '';
-  if (q.type === 'choice' && q.options) {
+  if ((q.type === 'choice' || q.type === 'multi') && q.options) {
     document.querySelectorAll('.opt-input').forEach(function (inp, i) { inp.value = q.options[i] ? q.options[i].text : ''; });
-    document.getElementById('q-answer-select').value = q.answer || 'A';
+    if (q.type === 'multi') {
+      document.querySelectorAll('.multi-ans').forEach(function (cb) { cb.checked = (q.answer || '').indexOf(cb.value) !== -1; });
+    } else {
+      document.getElementById('q-answer-select').value = q.answer || 'A';
+    }
+  } else if (q.type === 'judge') {
+    document.getElementById('q-answer-judge-select').value = q.answer || '正确';
   } else { document.getElementById('q-answer-text').value = q.answer || ''; }
   toggleQuestionModalOptions();
   switchModalTab('single', document.querySelector('[data-mtab="single"]'));

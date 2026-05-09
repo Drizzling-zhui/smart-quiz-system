@@ -121,12 +121,10 @@ function setChatContext(qId) {
   var ctx = document.getElementById('chat-context');
   ctx.style.display = 'block';
   ctx.innerHTML =
-    '<div class="ctx-info">' +
-      '<span style="color:var(--gray-500)">📌</span>' +
-      '<span style="font-weight:600">' + escHtml(q.question.slice(0, 40)) + (q.question.length > 40 ? '...' : '') + '</span>' +
-      '<button onclick="clearChatContext()" class="ctx-close" title="清除上下文">✕</button>' +
-    '</div>' +
-    '<button onclick="askAIAboutQuestion(' + q.id + ')" class="ctx-parse-btn">🤖 一键解析</button>';
+    '<span class="ctx-icon">📌</span>' +
+    '<span class="ctx-text">' + escHtml(q.question.slice(0, 40)) + (q.question.length > 40 ? '...' : '') + '</span>' +
+    '<button onclick="askAIAboutQuestion(' + q.id + ')" class="ctx-parse-btn">✨ 解析</button>' +
+    '<button onclick="clearChatContext()" class="ctx-close" title="清除">✕</button>';
 }
 
 function clearChatContext() {

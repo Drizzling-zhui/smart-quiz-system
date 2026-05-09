@@ -143,11 +143,7 @@ function renderImportPickerTree() {
 function renderImportPickerChildren(parentId, subject) {
   var children = getChildrenNodes(parentId, subject);
   if (!children.length) {
-    return '<div style="padding:4px 6px;font-size:11px;color:var(--gray-400);display:flex;gap:4px;align-items:center">' +
-      '<span>空文件夹</span>' +
-      '<button onclick="event.stopPropagation();importPickerNewFolder(\'' + parentId + '\')" style="border:none;background:none;cursor:pointer;font-size:11px" title="新建文件夹">📁+</button>' +
-      '<button onclick="event.stopPropagation();importPickerNewFile(\'' + parentId + '\')" style="border:none;background:none;cursor:pointer;font-size:11px" title="新建题库">📄+</button>' +
-    '</div>';
+    return '<div style="padding:4px 6px;font-size:11px;color:var(--gray-400)">空文件夹</div>';
   }
   // Sort: folders first, then files, A-Z
   children.sort(function (a, b) {

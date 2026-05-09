@@ -122,9 +122,13 @@ function renderImportPickerTree() {
     var root = getRootNode(s);
     if (!root) return;
     html += '<div style="margin-bottom:2px">';
-    html += '<div class="ip-subject-header" onclick="importPickerToggleFolder(\'' + root.id + '\')" style="display:flex;align-items:center;gap:4px;padding:4px 6px;cursor:pointer;font-weight:600;font-size:12px;border-radius:4px">';
-    html += '<span style="font-size:10px;width:12px">' + (root.expanded !== false ? '▼' : '▶') + '</span>';
-    html += '<span>📁 ' + escHtml(s.name) + '</span>';
+    html += '<div class="ip-subject-header" style="display:flex;align-items:center;gap:4px;padding:4px 6px;font-weight:600;font-size:12px;border-radius:4px">';
+    html += '<span onclick="importPickerToggleFolder(\'' + root.id + '\')" style="font-size:10px;width:12px;cursor:pointer">' + (root.expanded !== false ? '▼' : '▶') + '</span>';
+    html += '<span onclick="importPickerToggleFolder(\'' + root.id + '\')" style="cursor:pointer">📁 ' + escHtml(s.name) + '</span>';
+    html += '<span style="margin-left:auto;display:flex;gap:2px">' +
+      '<button onclick="event.stopPropagation();importPickerNewFolder(\'' + root.id + '\')" style="border:none;background:none;cursor:pointer;font-size:10px" title="新建文件夹">📁+</button>' +
+      '<button onclick="event.stopPropagation();importPickerNewFile(\'' + root.id + '\')" style="border:none;background:none;cursor:pointer;font-size:10px" title="新建题库">📄+</button>' +
+    '</span>';
     html += '</div>';
     if (root.expanded !== false) {
       html += '<div style="padding-left:16px">';

@@ -93,6 +93,12 @@ utils.js → data.js → settings.js → modal.js → sidebar.js → browse.js �
 - **仓库地址**：https://github.com/Drizzling-zhui/smart-quiz-system
 - **默认分支**：`master`
 
+### Git 提交规则（重要）
+
+- **禁止**在 commit message 中添加 `Co-Authored-By` 或任何形式的 co-author 署名
+- 作者身份由本地 git config 决定，commit message 只需写清楚改动内容
+- 所有 commit 的作者应为 `Drizzling_zhui`，不得出现 Claude/Claude Code/Anthropic 等署名
+
 ### Git 推送配置
 
 当前网络环境需要代理才能访问 GitHub：

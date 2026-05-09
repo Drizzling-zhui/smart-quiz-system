@@ -240,6 +240,7 @@ function renderQuizQuestion() {
       (!sub.correct ? '<div class="fb-answer">' + (q.type === 'choice' ? '正确答案：' + q.answer : '参考答案：' + escHtml(q.answer)) + '</div>' : '') +
       (q.explanation ? '<div class="fb-explain">💡 ' + escHtml(q.explanation) + '</div>' : '') +
       (sub.attempts > 1 ? '<div class="fb-explain" style="margin-top:4px;color:var(--warning)">本题已答 ' + sub.attempts + ' 次</div>' : '') +
+      '<button class="ask-ai" onclick="event.stopPropagation();openChat();setChatContext(' + q.id + ');askAIAboutQuestion(' + q.id + ')" style="margin-top:8px">🤖 AI 解析</button>' +
     '</div>';
   }
 

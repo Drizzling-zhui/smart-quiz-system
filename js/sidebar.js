@@ -32,10 +32,10 @@ function renderSidebar() {
   c.innerHTML = html;
 }
 
-function renderChildren(parentId, subject, level) {
+function renderChildren(parentId, subject, depth) {
   var children = getChildrenNodes(parentId, subject);
   if (!children.length) {
-    return '<div class="tree-empty" style="padding-left:' + ((level + 1) * 18) + 'px">空文件夹</div>';
+    return '<div class="tree-empty" style="padding-left:' + (6 + depth * 18) + 'px">空文件夹</div>';
   }
   // Sort: folders first (A-Z), then files (A-Z)
   children.sort(function (a, b) {
@@ -43,12 +43,12 @@ function renderChildren(parentId, subject, level) {
     return a.name.localeCompare(b.name, 'zh-CN');
   });
   return children.map(function (node) {
-    return renderTreeNode(node, subject, level);
+    return renderTreeNode(node, subject, depth);
   }).join('');
 }
 
-function renderTreeNode(node, subject, level) {
-  var pad = level * 18;
+function renderTreeNode(node, subject, depth) {
+  var pad = 6 + depth * 18;
   var isFolder = node.type === 'folder';
   var isSelected = currentNodeId === node.id;
   var isExpanded = node.expanded !== false;
@@ -98,10 +98,10 @@ function renderTreeNode(node, subject, level) {
         return a.name.localeCompare(b.name, 'zh-CN');
       });
       children.forEach(function (child) {
-        html += renderTreeNode(child, subject, level + 1);
+        html += renderTreeNode(child, subject, depth + 1);
       });
     } else {
-      html += '<div class="tree-empty" style="padding-left:' + ((level + 1) * 18) + 'px">空文件夹</div>';
+      html += '<div class="tree-empty" style="padding-left:' + (6 + (depth + 1) * 18) + 'px">空文件夹</div>';
     }
   }
 

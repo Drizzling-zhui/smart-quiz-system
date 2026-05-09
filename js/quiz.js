@@ -121,27 +121,20 @@ function startQuiz() {
   if (!quizTypeFilter.has('all')) pool = pool.filter(function (q) { return quizTypeFilter.has(q.type); });
   if (!pool.length) return toast('所选类型暂无题目', 'warning');
 
-  // Sort: favorites first
-  pool.sort(function (a, b) {
-    var aFav = isFavorite(a.id) ? 0 : 1;
-    var bFav = isFavorite(b.id) ? 0 : 1;
-    return aFav - bFav;
-  });
-
+  // Shuffle or sort
   pool = [].concat(pool);
   if (quizState.mode === 'random') {
-    // Shuffle non-favorites among themselves
-    var favPart = [];
-    var nonFavPart = [];
-    pool.forEach(function (q) {
-      if (isFavorite(q.id)) favPart.push(q);
-      else nonFavPart.push(q);
-    });
-    for (var i = nonFavPart.length - 1; i > 0; i--) {
+    for (var i = pool.length - 1; i > 0; i--) {
       var j = Math.floor(Math.random() * (i + 1));
-      var tmp = nonFavPart[i]; nonFavPart[i] = nonFavPart[j]; nonFavPart[j] = tmp;
+      var tmp = pool[i]; pool[i] = pool[j]; pool[j] = tmp;
     }
-    pool = favPart.concat(nonFavPart);
+  } else {
+    // Sequential: favorites first
+    pool.sort(function (a, b) {
+      var aFav = isFavorite(a.id) ? 0 : 1;
+      var bFav = isFavorite(b.id) ? 0 : 1;
+      return aFav - bFav;
+    });
   }
   if (count > 0 && count < pool.length) pool = pool.slice(0, count);
 

@@ -54,7 +54,11 @@ function renderTreeNode(node, subject, depth) {
   var isExpanded = node.expanded !== false;
   var qCount = isFolder ? countQuestionsInNode(node.id) : (node.questions || []).length;
 
-  var html = '<div class="tree-node' + (isSelected ? ' active' : '') + (isFolder ? ' folder-node' : ' file-node') + '" style="padding-left:' + pad + 'px" data-node-id="' + node.id + '">';
+  var isRoot = node.parentId === null;
+  var html = '<div class="tree-node' + (isSelected ? ' active' : '') + (isFolder ? ' folder-node' : ' file-node') + '" style="padding-left:' + pad + 'px" data-node-id="' + node.id + '"' +
+    (isRoot ? '' : ' draggable="true" ondragstart="handleDragStart(event,\'' + node.id + '\')" ondragend="handleDragEnd(event)"') +
+    (isFolder ? ' ondragover="handleDragOver(event,\'' + node.id + '\')" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event,\'' + node.id + '\')"' : '') +
+    '>';
 
   // Arrow or spacer
   if (isFolder) {
@@ -207,6 +211,74 @@ function collectDescendantIds(nodeId, subject, result) {
     result.push(child.id);
     if (child.type === 'folder') collectDescendantIds(child.id, subject, result);
   });
+}
+
+function isDescendantOf(ancestorId, nodeId) {
+  var subject = getSubjectByNodeId(nodeId);
+  if (!subject) return false;
+  var current = getNode(nodeId);
+  while (current && current.parentId) {
+    if (current.parentId === ancestorId) return true;
+    current = getNode(current.parentId);
+  }
+  return false;
+}
+
+var _dragNodeId = null;
+
+function handleDragStart(e, nodeId) {
+  _dragNodeId = nodeId;
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', nodeId);
+  setTimeout(function () { e.target.classList.add('dragging'); }, 0);
+}
+
+function handleDragEnd(e) {
+  _dragNodeId = null;
+  document.querySelectorAll('.tree-node.dragging, .tree-node.drag-over, .tree-node.drag-invalid').forEach(function (el) {
+    el.classList.remove('dragging', 'drag-over', 'drag-invalid');
+  });
+}
+
+function handleDragOver(e, nodeId) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  if (!_dragNodeId || _dragNodeId === nodeId || isDescendantOf(_dragNodeId, nodeId)) {
+    e.target.classList.add('drag-invalid');
+    e.target.classList.remove('drag-over');
+    return;
+  }
+  e.target.classList.add('drag-over');
+  e.target.classList.remove('drag-invalid');
+}
+
+function handleDragLeave(e) {
+  if (e.relatedTarget && e.target.contains(e.relatedTarget)) return;
+  e.target.classList.remove('drag-over', 'drag-invalid');
+}
+
+function handleDrop(e, targetNodeId) {
+  e.preventDefault();
+  e.target.classList.remove('drag-over', 'drag-invalid');
+  var nodeId = _dragNodeId;
+  _dragNodeId = null;
+  if (!nodeId || nodeId === targetNodeId) return;
+  moveNode(nodeId, targetNodeId);
+}
+
+function moveNode(nodeId, targetParentId) {
+  var node = getNode(nodeId);
+  var target = getNode(targetParentId);
+  if (!node || !target) return;
+  if (target.type !== 'folder') return;
+  if (node.parentId === targetParentId) return;
+  if (isDescendantOf(nodeId, targetParentId)) return;
+  node.parentId = targetParentId;
+  // Auto-expand target folder
+  target.expanded = true;
+  saveData();
+  renderSidebar();
+  toast('已移动「' + node.name + '」', 'info');
 }
 
 // ============================================================

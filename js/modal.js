@@ -23,8 +23,37 @@ function showModal(type, data) {
     toggleQuestionModalOptions();
     // Reset to single-add tab
     switchModalTab('single', document.querySelector('[data-mtab="single"]'));
+    updateSingleTargetDisplay();
     document.getElementById('modal-question').classList.add('active');
   }
+}
+
+function updateSingleTargetDisplay() {
+  var display = document.getElementById('single-target-display');
+  if (currentNodeId) {
+    var node = getNode(currentNodeId);
+    var subj = getSubjectByNodeId(currentNodeId);
+    if (node && node.type === 'file' && subj) {
+      display.textContent = subj.name + ' / ' + node.name + '（' + (node.questions || []).length + '题）';
+      display.style.color = 'var(--gray-800)';
+      return;
+    }
+  }
+  display.textContent = '请选择目标题库（点击右侧"更改"按钮）';
+  display.style.color = 'var(--gray-500)';
+}
+
+function pickTargetForSingle() {
+  showImportPicker(function (targetFileId) {
+    var node = getNode(targetFileId);
+    var subj = getSubjectByNodeId(targetFileId);
+    if (node && subj) {
+      currentNodeId = targetFileId;
+      currentSubject = subj.name;
+      updateSingleTargetDisplay();
+      renderSidebar();
+    }
+  });
 }
 
 function switchModalTab(tab, btn) {
@@ -119,5 +148,7 @@ function editQuestion(qId) {
     document.getElementById('q-answer-select').value = q.answer || 'A';
   } else { document.getElementById('q-answer-text').value = q.answer || ''; }
   toggleQuestionModalOptions();
+  switchModalTab('single', document.querySelector('[data-mtab="single"]'));
+  updateSingleTargetDisplay();
   document.getElementById('modal-question').classList.add('active');
 }

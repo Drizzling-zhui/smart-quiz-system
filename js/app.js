@@ -32,6 +32,7 @@ document.querySelectorAll('.modal-overlay').forEach(function (o) {
   o.addEventListener('click', function (e) {
     if (e.target === o) {
       o.classList.remove('active');
+      if (o.id === 'modal-import-picker') { _importPickerCallback = null; _importPickerSelectedFile = null; }
     }
   });
 });

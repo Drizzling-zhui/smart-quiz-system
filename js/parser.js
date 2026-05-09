@@ -119,17 +119,20 @@ function parseTextImport() {
 
 function importParsedQuestions() {
   if (!window._parsedQ || !window._parsedQ.length) return;
-  if (!currentNodeId) return toast('请先在左侧文件树中选择一个题库文件', 'warning');
-  var file = getNode(currentNodeId);
-  if (!file || file.type !== 'file') return toast('请先选择一个题库文件', 'warning');
 
-  var qs = window._parsedQ.map(function (q) {
-    return { id: Date.now() + Math.floor(Math.random() * 10000), type: q.type, question: q.question, options: q.options || [], answer: q.answer || '', score: q.score || 1, explanation: q.explanation || '', stats: { attempts: 0, correct: 0, wrong: 0 } };
-  });
-  qs.forEach(function (q) { file.questions.push(q); });
-  saveData(); renderSidebar(); renderBrowse();
-  document.getElementById('import-preview-text').innerHTML = ''; document.getElementById('import-text').value = '';
-  window._parsedQ = null; toast('导入成功！', 'success');
+  function doImport(targetFileId) {
+    var file = getNode(targetFileId);
+    if (!file || file.type !== 'file') return toast('目标题库无效', 'error');
+    var qs = window._parsedQ.map(function (q) {
+      return { id: Date.now() + Math.floor(Math.random() * 10000), type: q.type, question: q.question, options: q.options || [], answer: q.answer || '', score: q.score || 1, explanation: q.explanation || '', stats: { attempts: 0, correct: 0, wrong: 0 } };
+    });
+    qs.forEach(function (q) { file.questions.push(q); });
+    saveData(); renderSidebar(); renderBrowse();
+    document.getElementById('import-preview-text').innerHTML = ''; document.getElementById('import-text').value = '';
+    window._parsedQ = null; toast('导入成功！', 'success');
+  }
+
+  showImportPicker(doImport);
 }
 
 function aiParseText() {

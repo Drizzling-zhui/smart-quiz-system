@@ -158,6 +158,13 @@
     </div>
     <div class="mtab-content active" id="mtab-single">
       <div class="field">
+        <label>目标题库</label>
+        <div style="display:flex;gap:6px;align-items:center">
+          <span id="single-target-display" style="flex:1;padding:7px 10px;background:var(--gray-50);border:1px solid var(--gray-200);border-radius:6px;font-size:13px;color:var(--gray-500)">请先在左侧选择题库文件</span>
+          <button onclick="pickTargetForSingle()" style="padding:7px 12px;border:1px dashed var(--gray-300);background:#fff;border-radius:6px;cursor:pointer;font-size:12px;color:var(--gray-600);white-space:nowrap">更改</button>
+        </div>
+      </div>
+      <div class="field">
         <label>题目类型</label>
         <select id="q-type-select" onchange="toggleQuestionModalOptions()">
           <option value="choice">单选题</option>
@@ -196,7 +203,7 @@
         <p style="font-size:12px;color:var(--gray-500);margin-bottom:6px">粘贴从学习平台复制的题目文本，自动解析为标准格式</p>
         <textarea id="import-text" placeholder="在此粘贴题目文本..."></textarea>
         <div class="import-actions">
-          <button class="btn-primary" onclick="parseTextImport()">🔍 解析预览</button>
+          <button class="btn-primary" onclick="parseTextImport()">🔍 正则解析</button>
           <button class="btn-success" onclick="aiParseText()" id="btn-ai-parse" title="使用AI解析任意格式文本">🤖 AI 智能解析</button>
           <button class="btn-outline" onclick="document.getElementById('import-text').value=''">清空</button>
         </div>
@@ -223,6 +230,22 @@
   </div>
 </div>
 
+
+<div class="modal-overlay" id="modal-import-picker">
+  <div class="modal" style="max-width:500px;max-height:75vh">
+    <h3>📥 选择目标题库</h3>
+    <p style="font-size:12px;color:var(--gray-500);margin-bottom:10px">选择导入到的题库文件，或在文件夹中新建题库</p>
+    <div id="import-picker-tree" style="max-height:45vh;overflow-y:auto;border:1px solid var(--gray-200);border-radius:8px;padding:8px"></div>
+    <div style="margin-top:8px;display:flex;gap:4px">
+      <button onclick="importPickerNewSubject()" style="padding:4px 10px;font-size:11px;border:1px dashed var(--gray-300);background:#fff;border-radius:4px;cursor:pointer">＋ 新建学科</button>
+    </div>
+    <p id="import-picker-selected" style="font-size:12px;color:var(--primary);margin-top:6px;min-height:18px"></p>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="hideImportPicker()">取消</button>
+      <button class="btn-confirm" id="btn-import-confirm" onclick="confirmImportPicker()" disabled>确认选择</button>
+    </div>
+  </div>
+</div>
 
 <div class="toast-container" id="toast-container"></div>
 

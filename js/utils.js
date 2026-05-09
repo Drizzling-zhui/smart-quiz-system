@@ -50,7 +50,7 @@ function renderMD(text) {
     var lines = block.trim().split('\n');
     if (lines.length < 2) return block;
     // Check second line is a separator row
-    if (!/^\|[\s\-:]+\|$/.test(lines[1])) return block;
+    if (!/^\|[\s\-:|]+\|$/.test(lines[1])) return block;
     var renderRow = function (line, tag) {
       var cells = line.replace(/^\||\|$/g, '').split('|');
       return '<tr>' + cells.map(function (c) { return '<' + tag + '>' + c.trim() + '</' + tag + '>'; }).join('') + '</tr>';

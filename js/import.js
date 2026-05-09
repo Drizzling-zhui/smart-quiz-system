@@ -214,13 +214,13 @@ function importFixedJSON() {
     if (data.subjects && Array.isArray(data.subjects)) {
       data.subjects.forEach(function (sub) {
         var qs = (sub.questions || []).map(function (q) {
-          return { id: Date.now() + Math.floor(Math.random() * 10000), type: q.type, question: q.question, options: q.options || [], answer: q.answer || '', score: q.score || 1, explanation: q.explanation || '', stats: q.stats || { attempts: 0, correct: 0, wrong: 0 } };
+          return { id: Date.now() + Math.floor(Math.random() * 10000), type: q.type, question: q.question, options: q.options || [], answer: q.answer || '', explanation: q.explanation || '', stats: q.stats || { attempts: 0, correct: 0, wrong: 0 } };
         });
         qs.forEach(function (q) { file.questions.push(q); });
       });
     } else if (data.questions && Array.isArray(data.questions)) {
       var qs = data.questions.map(function (q) {
-        return { id: Date.now() + Math.floor(Math.random() * 10000), type: q.type, question: q.question, options: q.options || [], answer: q.answer || '', score: q.score || 1, explanation: q.explanation || '', stats: q.stats || { attempts: 0, correct: 0, wrong: 0 } };
+        return { id: Date.now() + Math.floor(Math.random() * 10000), type: q.type, question: q.question, options: q.options || [], answer: q.answer || '', explanation: q.explanation || '', stats: q.stats || { attempts: 0, correct: 0, wrong: 0 } };
       });
       qs.forEach(function (q) { file.questions.push(q); });
     }

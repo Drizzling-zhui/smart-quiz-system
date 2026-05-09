@@ -176,7 +176,6 @@
         <div id="q-answer-choice"><select id="q-answer-select"><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option></select></div>
         <textarea id="q-answer-text" style="display:none" rows="2" placeholder="输入答案内容..."></textarea>
       </div>
-      <div class="field"><label>分值</label><input type="number" id="q-score-input" value="1" min="0" step="0.1"></div>
       <div class="field"><label>解析（可选）</label><textarea id="q-explain-input" rows="2" placeholder="题目解析..."></textarea></div>
       <div class="modal-actions">
         <button class="btn-cancel" onclick="hideModal('question')">取消</button>
@@ -210,7 +209,7 @@
       </div>
       <div class="import-help">
         <strong>📖 格式说明</strong><br>
-        <code>{ "subjects": [{ "name": "学科", "questions": [{ "type":"choice|fill|short", "question":"题干", "options": [{"label":"A","text":"选项"}], "answer":"A", "score":1, "explanation":"解析" }] }] }</code>
+        <code>{ "subjects": [{ "name": "学科", "questions": [{ "type":"choice|fill|short", "question":"题干", "options": [{"label":"A","text":"选项"}], "answer":"A", "explanation":"解析" }] }] }</code>
       </div>
       <div class="modal-actions">
         <button class="btn-cancel" onclick="hideModal('question')">关闭</button>

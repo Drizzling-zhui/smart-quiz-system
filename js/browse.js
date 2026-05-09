@@ -105,7 +105,6 @@ function renderBrowse() {
         (isFav ? '<span style="cursor:pointer;font-size:14px" onclick="toggleFavorite(' + q.id + ');renderBrowse()" title="取消收藏">⭐</span>' : '<span style="cursor:pointer;font-size:14px;opacity:0.3" onclick="toggleFavorite(' + q.id + ');renderBrowse()" title="收藏">☆</span>') +
         '<span class="q-number">#' + (idx + 1) + '</span>' +
         '<span class="q-type ' + q.type + '">' + tm[q.type] + '</span>' +
-        '<span style="font-size:11px;color:var(--gray-400)">' + (q.score || 1) + '分</span>' +
       '</div>' +
       '<div class="q-text">' + escHtml(q.question) + '</div>' +
       (optsHtml ? '<div class="q-options">' + optsHtml + '</div>' : '') +

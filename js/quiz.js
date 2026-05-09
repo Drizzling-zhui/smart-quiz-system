@@ -215,7 +215,6 @@ function renderQuizQuestion() {
     '<div class="quiz-card">' +
       '<div class="q-meta">' +
         '<span class="q-type ' + q.type + '">' + typeMap[q.type] + '</span>' +
-        '<span style="font-size:12px;color:var(--gray-400)">' + (q.score || 1) + '分</span>' +
         (q.stats && q.stats.attempts > 0 ? '<span style="font-size:11px;color:var(--gray-400)">📊 此前答' + q.stats.attempts + '次 · 正确率' + Math.round(q.stats.correct / q.stats.attempts * 100) + '%</span>' : '') +
         '<span style="cursor:pointer;font-size:16px;margin-left:auto" onclick="toggleFavorite(' + q.id + ');renderQuizQuestion()" title="' + (isFav ? '取消收藏' : '收藏') + '">' + (isFav ? '⭐' : '☆') + '</span>' +
       '</div>' +
@@ -323,18 +322,17 @@ function prevQuizQuestion() {
 function finishQuiz() {
   var questions = quizState.questions;
   var submitted = quizState.submitted;
-  var correct = 0, wrong = 0, unanswered = 0, totalScore = 0, earnedScore = 0;
+  var correct = 0, wrong = 0, unanswered = 0;
 
   questions.forEach(function (q) {
     var s = submitted.find(function (sub) { return sub.qId === q.id; });
-    var score = q.score || 1;
-    totalScore += score;
-    if (s && s.correct) { correct++; earnedScore += score; }
+    if (s && s.correct) { correct++; }
     else if (s && !s.correct) { wrong++; }
     else { unanswered++; }
   });
 
-  var pct = totalScore > 0 ? Math.round((earnedScore / totalScore) * 100) : 0;
+  var total = questions.length;
+  var pct = total > 0 ? Math.round((correct / total) * 100) : 0;
   var grade = 'poor', gradeText = '继续加油！';
   if (pct >= 90) { grade = 'perfect'; gradeText = '太棒了！🎉'; }
   else if (pct >= 70) { grade = 'good'; gradeText = '不错！继续保持 💪'; }
@@ -356,7 +354,7 @@ function finishQuiz() {
     return '<div class="rv-item" style="border-left-color:' + color + '">' +
       '<div class="rv-header">' +
         '<span class="q-type ' + q.type + '">' + tm[q.type] + '</span>' +
-        '<span>' + icon + ' ' + (q.score || 1) + '分</span>' +
+        '<span>' + icon + '</span>' +
       '</div>' +
       '<div class="rv-question">' + (i + 1) + '. ' + escHtml(q.question) + '</div>' +
       '<div class="rv-answer">' +
@@ -374,7 +372,7 @@ function finishQuiz() {
     '<div class="quiz-result">' +
       '<div class="score-circle ' + grade + '">' + pct + '%</div>' +
       '<h2 style="margin-bottom:4px;font-size:18px">' + gradeText + '</h2>' +
-      '<p style="color:var(--gray-500);font-size:13px;margin-bottom:12px">获得 ' + earnedScore.toFixed(1) + ' / ' + totalScore.toFixed(1) + ' 分</p>' +
+      '<p style="color:var(--gray-500);font-size:13px;margin-bottom:12px">答对 ' + correct + ' / ' + total + ' 题</p>' +
       '<div class="detail">' +
         '<div class="stat correct"><div class="num">' + correct + '</div><div class="lbl">正确</div></div>' +
         '<div class="stat wrong"><div class="num">' + wrong + '</div><div class="lbl">错误</div></div>' +

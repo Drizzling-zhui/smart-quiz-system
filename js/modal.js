@@ -11,7 +11,6 @@ function showModal(type, data) {
     document.getElementById('q-text-input').value = '';
     document.getElementById('q-answer-select').value = 'A';
     document.getElementById('q-answer-text').value = '';
-    document.getElementById('q-score-input').value = '1';
     document.getElementById('q-explain-input').value = '';
     document.querySelectorAll('.opt-input').forEach(function (i) { i.value = ''; });
     toggleQuestionModalOptions();
@@ -82,7 +81,6 @@ function saveQuestion() {
   var type = document.getElementById('q-type-select').value;
   var question = document.getElementById('q-text-input').value.trim();
   if (!question) return toast('请输入题目内容', 'warning');
-  var score = parseFloat(document.getElementById('q-score-input').value) || 1;
   var explanation = document.getElementById('q-explain-input').value.trim();
   var options = [], answer = '';
   if (type === 'choice') {
@@ -95,7 +93,7 @@ function saveQuestion() {
     answer = document.getElementById('q-answer-text').value.trim();
     if (!answer) return toast('请输入答案', 'warning');
   }
-  var qData = { type: type, question: question, options: options, answer: answer, score: score, explanation: explanation };
+  var qData = { type: type, question: question, options: options, answer: answer, explanation: explanation };
   if (editingQuestionId) {
     updateQuestion(currentSubject, editingQuestionId, qData);
     toast('题目已更新', 'success');
@@ -126,7 +124,6 @@ function editQuestion(qId) {
   document.getElementById('modal-q-title').textContent = '编辑题目';
   document.getElementById('q-type-select').value = q.type;
   document.getElementById('q-text-input').value = q.question;
-  document.getElementById('q-score-input').value = q.score || 1;
   document.getElementById('q-explain-input').value = q.explanation || '';
   if (q.type === 'choice' && q.options) {
     document.querySelectorAll('.opt-input').forEach(function (inp, i) { inp.value = q.options[i] ? q.options[i].text : ''; });

@@ -24,7 +24,7 @@ function parseQuizText(text) {
     var qNumMatch = line.match(/^(\d+)\.\s*(?:\(([^)]+)\))?\s*$/);
     if (qNumMatch) {
       if (currentQ) { finalizeQ(currentQ, questionTextLines); if (currentQ.question) questions.push(currentQ); }
-      currentQ = { id: Date.now() + questions.length, type: currentType, question: '', options: [], answer: '', explanation: '', score: 1, stats: { attempts: 0, correct: 0, wrong: 0 } };
+      currentQ = { id: Date.now() + questions.length, type: currentType, question: '', options: [], answer: '', explanation: '', stats: { attempts: 0, correct: 0, wrong: 0 } };
       questionTextLines = [];
       if (qNumMatch[2]) {
         if (qNumMatch[2].includes('填空')) currentQ.type = 'fill';
@@ -45,8 +45,7 @@ function parseQuizText(text) {
       } else currentQ.answer = ca.replace(/^[A-Da-d][：:]\s*/, '').trim();
       continue;
     }
-    var sm = line.match(/^([\d.]+)分/);
-    if (sm) { currentQ.score = parseFloat(sm[1]) || 1; continue; }
+    if (/^([\d.]+)分/.test(line)) continue;
     var em = line.match(/^答案解析[：:]\s*(.+)/);
     if (em) { currentQ.explanation = em[1].trim(); continue; }
     if (/^AI讲解/.test(line) || /^智能分析/.test(line)) continue;
@@ -124,7 +123,7 @@ function importParsedQuestions() {
     var file = getNode(targetFileId);
     if (!file || file.type !== 'file') return toast('目标题库无效', 'error');
     var qs = window._parsedQ.map(function (q) {
-      return { id: Date.now() + Math.floor(Math.random() * 10000), type: q.type, question: q.question, options: q.options || [], answer: q.answer || '', score: q.score || 1, explanation: q.explanation || '', stats: { attempts: 0, correct: 0, wrong: 0 } };
+      return { id: Date.now() + Math.floor(Math.random() * 10000), type: q.type, question: q.question, options: q.options || [], answer: q.answer || '', explanation: q.explanation || '', stats: { attempts: 0, correct: 0, wrong: 0 } };
     });
     qs.forEach(function (q) { file.questions.push(q); });
     saveData(); renderSidebar(); renderBrowse();
@@ -144,7 +143,7 @@ function aiParseText() {
   var btn = document.getElementById('btn-ai-parse');
   btn.textContent = '⏳ AI解析中...'; btn.disabled = true;
   var cfg = getApiConfig();
-  var prompt = '你是一个题目解析助手。请从以下文本中提取所有题目，以JSON数组格式返回，不要包含其他文字。\n\n每个题目格式：\n{\n  "type": "choice" | "fill" | "short",\n  "question": "题干",\n  "options": [{"label":"A","text":"选项内容"}],\n  "answer": "正确答案",\n  "score": 分值(数字),\n  "explanation": "解析内容"\n}\n\n规则：\n- 选择题type为choice，填空题type为fill，简答题type为short\n- 选择题必须提取选项(A/B/C/D)\n- 提取正确答案，选择题提取字母选项\n- 分值未标明则设为1\n- 忽略页眉页脚和无关信息\n- 解析内容可能为空\n\n文本内容：\n' + text;
+  var prompt = '你是一个题目解析助手。请从以下文本中提取所有题目，以JSON数组格式返回，不要包含其他文字。\n\n每个题目格式：\n{\n  "type": "choice" | "fill" | "short",\n  "question": "题干",\n  "options": [{"label":"A","text":"选项内容"}],\n  "answer": "正确答案",\n  "explanation": "解析内容"\n}\n\n规则：\n- 选择题type为choice，填空题type为fill，简答题type为short\n- 选择题必须提取选项(A/B/C/D)\n- 提取正确答案，选择题提取字母选项\n- 忽略页眉页脚和无关信息\n- 解析内容可能为空\n\n文本内容：\n' + text;
 
   fetch(cfg.endpoint, {
     method: 'POST',
@@ -169,7 +168,6 @@ function aiParseText() {
     if (!Array.isArray(questions) || !questions.length) throw new Error('未解析出题目');
     questions.forEach(function (q) {
       if (!q.type) q.type = 'choice';
-      if (!q.score) q.score = 1;
       if (!q.explanation) q.explanation = '';
       if (!q.options) q.options = [];
       if (!q.answer) q.answer = '';

@@ -18,6 +18,8 @@ function renderSidebar() {
         '<span class="subj-name">' + escHtml(s.name) + '</span>' +
         '<span class="subj-count">' + total + '</span>' +
         '<span class="subj-actions">' +
+          '<button onclick="event.stopPropagation();promptNewFolder(\'' + root.id + '\')" title="新建文件夹">📁+</button>' +
+          '<button onclick="event.stopPropagation();promptNewFile(\'' + root.id + '\')" title="新建题库">📄+</button>' +
           '<button onclick="event.stopPropagation();showModal(\'subject\',\'' + escHtml(s.name) + '\')" title="重命名">✏️</button>' +
           '<button class="del" onclick="event.stopPropagation();confirmAction(\'删除学科「' + escHtml(s.name) + '」及其全部内容？\',function(){deleteSubject(\'' + escHtml(s.name) + '\')})" title="删除">🗑️</button>' +
         '</span>' +
@@ -33,8 +35,13 @@ function renderSidebar() {
 function renderChildren(parentId, subject, level) {
   var children = getChildrenNodes(parentId, subject);
   if (!children.length) {
-    return '<div class="tree-empty" style="padding-left:' + ((level + 1) * 18) + 'px">空文件夹 · 点 + 创建</div>';
+    return '<div class="tree-empty" style="padding-left:' + ((level + 1) * 18) + 'px">空文件夹</div>';
   }
+  // Sort: folders first (A-Z), then files (A-Z)
+  children.sort(function (a, b) {
+    if (a.type !== b.type) return a.type === 'folder' ? -1 : 1;
+    return a.name.localeCompare(b.name, 'zh-CN');
+  });
   return children.map(function (node) {
     return renderTreeNode(node, subject, level);
   }).join('');
@@ -47,7 +54,7 @@ function renderTreeNode(node, subject, level) {
   var isExpanded = node.expanded !== false;
   var qCount = isFolder ? countQuestionsInNode(node.id) : (node.questions || []).length;
 
-  var html = '<div class="tree-node' + (isSelected ? ' active' : '') + '" style="padding-left:' + pad + 'px" data-node-id="' + node.id + '">';
+  var html = '<div class="tree-node' + (isSelected ? ' active' : '') + (isFolder ? ' folder-node' : ' file-node') + '" style="padding-left:' + pad + 'px" data-node-id="' + node.id + '">';
 
   // Arrow or spacer
   if (isFolder) {
@@ -84,11 +91,17 @@ function renderTreeNode(node, subject, level) {
   // Render children if folder and expanded
   if (isFolder && isExpanded) {
     var children = getChildrenNodes(node.id, subject);
-    children.forEach(function (child) {
-      html += renderTreeNode(child, subject, level + 1);
-    });
-    if (!children.length && isExpanded) {
-      html += '<div class="tree-empty" style="padding-left:' + ((level + 1) * 18) + 'px">空文件夹 · 点 📁+ 创建</div>';
+    if (children.length) {
+      // Sort: folders first (A-Z), then files (A-Z)
+      children.sort(function (a, b) {
+        if (a.type !== b.type) return a.type === 'folder' ? -1 : 1;
+        return a.name.localeCompare(b.name, 'zh-CN');
+      });
+      children.forEach(function (child) {
+        html += renderTreeNode(child, subject, level + 1);
+      });
+    } else {
+      html += '<div class="tree-empty" style="padding-left:' + ((level + 1) * 18) + 'px">空文件夹</div>';
     }
   }
 

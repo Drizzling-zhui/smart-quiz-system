@@ -35,7 +35,7 @@ function renderSidebar() {
 function renderChildren(parentId, subject, depth) {
   var children = getChildrenNodes(parentId, subject);
   if (!children.length) {
-    return '<div class="tree-empty" style="padding-left:' + (6 + depth * 18) + 'px">空文件夹</div>';
+    return '<div class="tree-empty" style="padding-left:' + (14 + depth * 18) + 'px">空文件夹</div>';
   }
   // Sort: folders first (A-Z), then files (A-Z)
   children.sort(function (a, b) {
@@ -48,7 +48,7 @@ function renderChildren(parentId, subject, depth) {
 }
 
 function renderTreeNode(node, subject, depth) {
-  var pad = 6 + depth * 18;
+  var pad = 14 + depth * 18;
   var isFolder = node.type === 'folder';
   var isSelected = currentNodeId === node.id;
   var isExpanded = node.expanded !== false;
@@ -101,7 +101,7 @@ function renderTreeNode(node, subject, depth) {
         html += renderTreeNode(child, subject, depth + 1);
       });
     } else {
-      html += '<div class="tree-empty" style="padding-left:' + (6 + (depth + 1) * 18) + 'px">空文件夹</div>';
+      html += '<div class="tree-empty" style="padding-left:' + (14 + (depth + 1) * 18) + 'px">空文件夹</div>';
     }
   }
 

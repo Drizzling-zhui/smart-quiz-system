@@ -40,8 +40,7 @@ document.addEventListener('keydown', function (e) {
   if (e.key === 'Escape') document.querySelectorAll('.modal-overlay.active').forEach(function (m) { m.classList.remove('active'); });
   if (e.key === 'Enter' && document.querySelector('.modal-overlay.active')) {
     var m = document.querySelector('.modal-overlay.active');
-    if (m.id === 'modal-subject') saveSubject();
-    else if (m.id === 'modal-question') saveQuestion();
+    if (m.id === 'modal-question') saveQuestion();
   }
 });
 

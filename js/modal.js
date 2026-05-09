@@ -4,13 +4,7 @@
 var editingQuestionId = null;
 
 function showModal(type, data) {
-  if (type === 'subject') {
-    document.getElementById('modal-subject-title').textContent = data ? '重命名学科' : '添加学科';
-    document.getElementById('subject-name-input').value = data || '';
-    document.getElementById('subject-name-input').dataset.edit = data || '';
-    document.getElementById('modal-subject').classList.add('active');
-    setTimeout(function () { document.getElementById('subject-name-input').focus(); }, 100);
-  } else if (type === 'question') {
+  if (type === 'question') {
     editingQuestionId = null;
     document.getElementById('modal-q-title').textContent = '添加题目';
     document.getElementById('q-type-select').value = 'choice';
@@ -80,15 +74,6 @@ function toggleQuestionModalOptions() {
   document.getElementById('q-answer-choice').style.display = t === 'choice' ? 'block' : 'none';
   document.getElementById('q-answer-text').style.display = t !== 'choice' ? 'block' : 'none';
   document.getElementById('q-answer-label').textContent = t === 'choice' ? '正确答案' : t === 'fill' ? '答案' : '参考答案';
-}
-
-function saveSubject() {
-  var input = document.getElementById('subject-name-input');
-  var name = input.value.trim();
-  var edit = input.dataset.edit;
-  if (!name) return toast('请输入学科名称', 'warning');
-  if (edit) renameSubject(edit, name); else addSubject(name);
-  hideModal('subject');
 }
 
 function saveQuestion() {

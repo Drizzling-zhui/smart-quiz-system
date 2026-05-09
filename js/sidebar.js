@@ -20,7 +20,7 @@ function renderSidebar() {
         '<span class="subj-actions">' +
           '<button onclick="event.stopPropagation();promptNewFolder(\'' + root.id + '\')" title="新建文件夹">📁+</button>' +
           '<button onclick="event.stopPropagation();promptNewFile(\'' + root.id + '\')" title="新建题库">📄+</button>' +
-          '<button onclick="event.stopPropagation();showModal(\'subject\',\'' + escHtml(s.name) + '\')" title="重命名">✏️</button>' +
+          '<button onclick="event.stopPropagation();promptRenameSubject(\'' + escHtml(s.name) + '\')" title="重命名">✏️</button>' +
           '<button class="del" onclick="event.stopPropagation();confirmAction(\'删除学科「' + escHtml(s.name) + '」及其全部内容？\',function(){deleteSubject(\'' + escHtml(s.name) + '\')})" title="删除">🗑️</button>' +
         '</span>' +
       '</div>' +
@@ -284,6 +284,12 @@ function moveNode(nodeId, targetParentId) {
 // ============================================================
 // SUBJECT CRUD
 // ============================================================
+function promptNewSubject() {
+  var name = prompt('新建学科名称：');
+  if (!name || !name.trim()) return;
+  addSubject(name.trim());
+}
+
 function addSubject(name) {
   if (!name.trim()) return toast('请输入学科名称', 'warning');
   if (getSubject(name.trim())) return toast('该学科已存在', 'warning');
@@ -297,6 +303,12 @@ function addSubject(name) {
   });
   saveData(); renderSidebar(); switchTab('browse');
   toast('学科「' + name.trim() + '」已添加', 'success');
+}
+
+function promptRenameSubject(oldName) {
+  var newName = prompt('重命名学科：', oldName);
+  if (!newName || !newName.trim() || newName.trim() === oldName) return;
+  renameSubject(oldName, newName.trim());
 }
 
 function renameSubject(oldName, newName) {

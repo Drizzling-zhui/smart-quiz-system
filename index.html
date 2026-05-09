@@ -21,7 +21,7 @@
     </div>
     <div id="subject-list"></div>
     <div class="sidebar-footer">
-      <button onclick="showModal('subject')">＋ 添加学科</button>
+      <button onclick="promptNewSubject()">＋ 添加学科</button>
     </div>
   </aside>
 
@@ -138,17 +138,6 @@
 </div>
 
 <!-- Modals -->
-<div class="modal-overlay" id="modal-subject">
-  <div class="modal">
-    <h3 id="modal-subject-title">添加学科</h3>
-    <div class="field"><label>学科名称</label><input type="text" id="subject-name-input" placeholder="例如：计算机网络" maxlength="50"></div>
-    <div class="modal-actions">
-      <button class="btn-cancel" onclick="hideModal('subject')">取消</button>
-      <button class="btn-confirm" onclick="saveSubject()">确定</button>
-    </div>
-  </div>
-</div>
-
 <div class="modal-overlay" id="modal-question">
   <div class="modal" style="max-width:580px">
     <h3 id="modal-q-title">添加题目</h3>

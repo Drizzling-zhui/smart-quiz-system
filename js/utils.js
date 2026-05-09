@@ -45,7 +45,22 @@ function renderMD(text) {
     return '<ol>' + items + '</ol>';
   });
 
-  // Step 7: bold (after lists to avoid conflicts with * prefix)
+  // Step 7: tables — consecutive lines starting with |
+  html = html.replace(/((?:^\|.+\|(?:\n|$))+)/gm, function (block) {
+    var lines = block.trim().split('\n');
+    if (lines.length < 2) return block;
+    // Check second line is a separator row
+    if (!/^\|[\s\-:]+\|$/.test(lines[1])) return block;
+    var renderRow = function (line, tag) {
+      var cells = line.replace(/^\||\|$/g, '').split('|');
+      return '<tr>' + cells.map(function (c) { return '<' + tag + '>' + c.trim() + '</' + tag + '>'; }).join('') + '</tr>';
+    };
+    var thead = '<thead>' + renderRow(lines[0], 'th') + '</thead>';
+    var tbody = '<tbody>' + lines.slice(2).map(function (l) { return renderRow(l, 'td'); }).join('') + '</tbody>';
+    return '<table>' + thead + tbody + '</table>';
+  });
+
+  // Step 8: bold (after lists to avoid conflicts with * prefix)
   html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
 
   // Step 8: italic (single *, not part of **)

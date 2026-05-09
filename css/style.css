@@ -312,6 +312,10 @@ body.resizing .chat-resize-handle { background: rgba(79,110,247,.25); }
 .chat-msg strong { font-weight: 600; }
 .chat-msg a { color: var(--primary); text-decoration: underline; }
 .chat-msg hr { border: none; border-top: 1px solid var(--gray-200); margin: 8px 0; }
+.chat-msg table { width: 100%; border-collapse: collapse; margin: 6px 0; font-size: 12px; }
+.chat-msg th, .chat-msg td { border: 1px solid var(--gray-200); padding: 6px 10px; text-align: left; }
+.chat-msg th { background: var(--gray-100); font-weight: 600; }
+.chat-msg td { background: #fff; }
 
 /* Loading dots animation */
 .loading-dots { color: var(--gray-400); }

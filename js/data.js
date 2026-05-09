@@ -41,6 +41,7 @@ function loadData() {
     if (raw) appData = JSON.parse(raw);
     if (!appData.subjects) appData.subjects = [];
     // Migration from v1/v2 to v2.0 (tree model)
+    if (!appData.version || appData.version !== '2.0') {
     appData.subjects.forEach(function (s) {
       if (!s.nodes) {
         // Old format: questions[] directly on subject
@@ -65,6 +66,7 @@ function loadData() {
     });
     appData.version = '2.0';
     saveData();
+    }
   } catch (e) { console.warn('Load error', e); }
   loadFavorites();
 }

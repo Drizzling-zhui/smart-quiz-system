@@ -47,6 +47,7 @@ function saveSubject() {
 }
 
 function saveQuestion() {
+  if (!currentNodeId) return toast('请先选择一个题库文件', 'warning');
   if (!currentSubject) return toast('请先选择学科', 'warning');
   var type = document.getElementById('q-type-select').value;
   var question = document.getElementById('q-text-input').value.trim();
@@ -76,8 +77,21 @@ function saveQuestion() {
 }
 
 function editQuestion(qId) {
-  var subj = getSubject(currentSubject); if (!subj) return;
-  var q = subj.questions.find(function (q) { return q.id === qId; }); if (!q) return;
+  // Search across all file nodes (v2.0 tree model)
+  var q = null;
+  var fileNodeId = null;
+  for (var i = 0; i < appData.subjects.length; i++) {
+    var nodes = appData.subjects[i].nodes || [];
+    for (var j = 0; j < nodes.length; j++) {
+      if (nodes[j].type === 'file' && nodes[j].questions) {
+        var found = nodes[j].questions.find(function (x) { return x.id === qId; });
+        if (found) { q = found; fileNodeId = nodes[j].id; currentSubject = appData.subjects[i].name; break; }
+      }
+    }
+    if (q) break;
+  }
+  if (!q) return;
+  currentNodeId = fileNodeId;
   editingQuestionId = qId;
   document.getElementById('modal-q-title').textContent = '编辑题目';
   document.getElementById('q-type-select').value = q.type;
@@ -89,5 +103,5 @@ function editQuestion(qId) {
     document.getElementById('q-answer-select').value = q.answer || 'A';
   } else { document.getElementById('q-answer-text').value = q.answer || ''; }
   toggleQuestionModalOptions();
-  showModal('question');
+  document.getElementById('modal-question').classList.add('active');
 }

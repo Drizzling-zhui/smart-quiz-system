@@ -95,22 +95,6 @@ function renderTreeNode(node, subject, level) {
   return html;
 }
 
-// ============================================================
-// TREE OPERATIONS
-// ============================================================
-function selectNode(nodeId) {
-  var node = getNode(nodeId);
-  if (!node) return;
-  if (node.type !== 'file') return;
-  currentNodeId = nodeId;
-  var subj = getSubjectByNodeId(nodeId);
-  currentSubject = subj ? subj.name : null;
-  currentFilter = 'all';
-  document.querySelectorAll('.filter-btn').forEach(function (b) { b.classList.toggle('active', b.dataset.filter === 'all'); });
-  renderSidebar();
-  renderBrowse();
-}
-
 function toggleFolder(nodeId) {
   var node = getNode(nodeId);
   if (!node || node.type !== 'folder') return;

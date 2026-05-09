@@ -85,6 +85,7 @@ function selectQuizMode(mode, el) {
 }
 
 function renderQuizSetup() {
+  quizState.started = false;
   document.getElementById('quiz-setup').style.display = 'block';
   document.getElementById('quiz-playing').style.display = 'none';
   document.getElementById('quiz-result-area').style.display = 'none';
@@ -152,8 +153,12 @@ function startQuiz() {
   document.getElementById('quiz-setup').style.display = 'none';
   document.getElementById('quiz-playing').style.display = 'block';
   document.getElementById('quiz-result-area').style.display = 'none';
-  // Switch to quiz tab if needed
-  switchTab('quiz');
+  // Ensure quiz tab is active without resetting the quiz state
+  if (!document.getElementById('view-quiz').classList.contains('active')) {
+    document.querySelectorAll('.tab-btn').forEach(function (b) { b.classList.toggle('active', b.dataset.tab === 'quiz'); });
+    document.querySelectorAll('.view').forEach(function (v) { v.classList.remove('active'); });
+    document.getElementById('view-quiz').classList.add('active');
+  }
   renderQuizQuestion();
 }
 
@@ -325,14 +330,15 @@ function prevQuizQuestion() {
 function finishQuiz() {
   var questions = quizState.questions;
   var submitted = quizState.submitted;
-  var correct = 0, wrong = 0, totalScore = 0, earnedScore = 0;
+  var correct = 0, wrong = 0, unanswered = 0, totalScore = 0, earnedScore = 0;
 
   questions.forEach(function (q) {
     var s = submitted.find(function (sub) { return sub.qId === q.id; });
     var score = q.score || 1;
     totalScore += score;
     if (s && s.correct) { correct++; earnedScore += score; }
-    else { wrong++; }
+    else if (s && !s.correct) { wrong++; }
+    else { unanswered++; }
   });
 
   var pct = totalScore > 0 ? Math.round((earnedScore / totalScore) * 100) : 0;
@@ -348,20 +354,22 @@ function finishQuiz() {
   var reviewHtml = questions.map(function (q, i) {
     var s = submitted.find(function (sub) { return sub.qId === q.id; });
     var isCorrect = s && s.correct;
-    var color = isCorrect ? 'var(--success)' : 'var(--danger)';
+    var isWrong = s && !s.correct;
+    var color = isCorrect ? 'var(--success)' : isWrong ? 'var(--danger)' : 'var(--gray-400)';
+    var icon = isCorrect ? '✅' : isWrong ? '❌' : '⚪';
     var ua = s ? s.userAnswer : '未作答';
     var tm = { choice: '单选题', fill: '填空题', short: '简答题' };
     var att = s ? s.attempts : 0;
     return '<div class="rv-item" style="border-left-color:' + color + '">' +
       '<div class="rv-header">' +
         '<span class="q-type ' + q.type + '">' + tm[q.type] + '</span>' +
-        '<span>' + (isCorrect ? '✅' : '❌') + ' ' + (q.score || 1) + '分</span>' +
+        '<span>' + icon + ' ' + (q.score || 1) + '分</span>' +
       '</div>' +
       '<div class="rv-question">' + (i + 1) + '. ' + escHtml(q.question) + '</div>' +
       '<div class="rv-answer">' +
         (q.type === 'choice'
-          ? '你的答案：<span style="' + (isCorrect ? 'color:var(--success)' : 'color:var(--danger);text-decoration:line-through') + '">' + escHtml(ua) + '</span> · 正确答案：<span style="color:var(--success);font-weight:600">' + escHtml(q.answer) + '</span>'
-          : '你的答案：<span style="' + (isCorrect ? 'color:var(--success)' : 'color:var(--danger);text-decoration:line-through') + '">' + escHtml(ua) + '</span> · 参考答案：<span style="color:var(--success);font-weight:600">' + escHtml(q.answer) + '</span>'
+          ? '你的答案：<span style="' + (isCorrect ? 'color:var(--success)' : isWrong ? 'color:var(--danger);text-decoration:line-through' : 'color:var(--gray-400)') + '">' + escHtml(ua) + '</span> · 正确答案：<span style="color:var(--success);font-weight:600">' + escHtml(q.answer) + '</span>'
+          : '你的答案：<span style="' + (isCorrect ? 'color:var(--success)' : isWrong ? 'color:var(--danger);text-decoration:line-through' : 'color:var(--gray-400)') + '">' + escHtml(ua) + '</span> · 参考答案：<span style="color:var(--success);font-weight:600">' + escHtml(q.answer) + '</span>'
         ) +
         (q.explanation ? '<br>💡 ' + escHtml(q.explanation) : '') +
         (att > 1 ? '<br><span class="rv-attempts">提交了 ' + att + ' 次</span>' : '') +
@@ -377,6 +385,7 @@ function finishQuiz() {
       '<div class="detail">' +
         '<div class="stat correct"><div class="num">' + correct + '</div><div class="lbl">正确</div></div>' +
         '<div class="stat wrong"><div class="num">' + wrong + '</div><div class="lbl">错误</div></div>' +
+        (unanswered > 0 ? '<div class="stat"><div class="num" style="color:var(--gray-400)">' + unanswered + '</div><div class="lbl">未答</div></div>' : '') +
         '<div class="stat"><div class="num">' + questions.length + '</div><div class="lbl">总题数</div></div>' +
       '</div>' +
       '<div>' +

@@ -7,7 +7,7 @@ function switchTab(tab) {
   document.getElementById('view-' + tab).classList.add('active');
   if (tab === 'browse') renderBrowse();
   if (tab === 'quiz') {
-    renderQuizSetup();
+    if (!quizState.started) renderQuizSetup();
     var panel = document.getElementById('chat-panel');
     if (panel.classList.contains('open')) toggleChat();
   }

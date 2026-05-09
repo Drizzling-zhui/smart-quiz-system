@@ -120,12 +120,13 @@ function setChatContext(qId) {
   chatState.questionContext = q;
   var ctx = document.getElementById('chat-context');
   ctx.style.display = 'block';
-  ctx.innerHTML = '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">' +
-    '<span style="font-size:12px;color:var(--gray-500)">📌 当前题目：</span>' +
-    '<span style="font-size:12px;font-weight:600">' + escHtml(q.question.slice(0, 40)) + (q.question.length > 40 ? '...' : '') + '</span>' +
-    '<button onclick="clearChatContext()" style="background:none;border:none;cursor:pointer;font-size:14px" title="清除上下文">✕</button>' +
-    '<button onclick="askAIAboutQuestion(' + q.id + ')" style="margin-left:auto;padding:4px 10px;border:1px solid var(--primary);background:var(--primary-light);color:var(--primary);border-radius:4px;cursor:pointer;font-size:12px">🤖 一键解析</button>' +
-  '</div>';
+  ctx.innerHTML =
+    '<div class="ctx-info">' +
+      '<span style="color:var(--gray-500)">📌</span>' +
+      '<span style="font-weight:600">' + escHtml(q.question.slice(0, 40)) + (q.question.length > 40 ? '...' : '') + '</span>' +
+      '<button onclick="clearChatContext()" class="ctx-close" title="清除上下文">✕</button>' +
+    '</div>' +
+    '<button onclick="askAIAboutQuestion(' + q.id + ')" class="ctx-parse-btn">🤖 一键解析</button>';
 }
 
 function clearChatContext() {

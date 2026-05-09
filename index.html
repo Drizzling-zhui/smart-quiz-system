@@ -132,8 +132,8 @@
         <button onclick="toggleChat()" title="关闭面板">✕</button>
       </div>
     </div>
-    <div id="chat-context" style="display:none"></div>
     <div class="chat-messages" id="chat-messages"></div>
+    <div id="chat-context" style="display:none"></div>
     <div class="chat-input-area">
       <textarea id="chat-input" placeholder="输入问题..." rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChatMessage();}"></textarea>
       <button onclick="sendChatMessage()">发送</button>

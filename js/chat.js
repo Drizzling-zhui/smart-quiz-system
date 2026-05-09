@@ -123,8 +123,8 @@ function setChatContext(qId) {
   ctx.innerHTML =
     '<span class="ctx-label">📌 题目</span>' +
     '<span class="ctx-text">' + escHtml(q.question.slice(0, 30)) + (q.question.length > 30 ? '…' : '') + '</span>' +
-    '<button onclick="askAIAboutQuestion(' + q.id + ')" class="ctx-parse-btn">✨ 解析</button>' +
-    '<button onclick="clearChatContext()" class="ctx-close">✕</button>';
+    '<button onclick="clearChatContext()" class="ctx-close">✕</button>' +
+    '<button onclick="askAIAboutQuestion(' + q.id + ')" class="ctx-parse-btn">✨ 解析</button>';
 }
 
 function clearChatContext() {

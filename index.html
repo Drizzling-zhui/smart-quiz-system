@@ -97,9 +97,14 @@
                     <span class="mode-label">随机答题</span>
                     <span class="mode-desc">打乱顺序出题</span>
                   </div>
+                  <div class="mode-btn" data-mode="wrong" onclick="selectQuizMode('wrong',this)">
+                    <span class="mode-icon">🔄</span>
+                    <span class="mode-label">错题重刷</span>
+                    <span class="mode-desc">只练错过的题</span>
+                  </div>
                 </div>
               </div>
-              <div class="field">
+              <div class="field" id="quiz-count-field">
                 <label>题目数量 <span style="font-weight:400;color:var(--gray-400)" id="quiz-avail-count"></span></label>
                 <input type="number" id="quiz-count" value="10" min="0" max="500">
               </div>
@@ -128,6 +133,7 @@
     <div class="chat-header">
       <h3>💬 AI 助手</h3>
       <div class="chat-actions">
+        <button onclick="toggleFastMode()" id="btn-fast-mode" title="快速模式">⚡</button>
         <button onclick="clearChat()" title="清空对话">🗑️</button>
         <button onclick="toggleChat()" title="关闭面板">✕</button>
       </div>
@@ -300,6 +306,13 @@
         <strong>通义千问</strong>：https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions<br>
         <strong>Claude (Anthropic)</strong>：https://api.anthropic.com/v1/messages（模型填 claude-sonnet-4-20250514）
       </div>
+    </div>
+    <div class="field">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+        <input type="checkbox" id="settings-fast-mode" onchange="chatFastMode=this.checked;saveChatFastMode();updateFastModeBtn()">
+        ⚡ 快速模式（禁用 AI 深度思考，响应更快）
+      </label>
+      <p style="font-size:11px;color:var(--gray-400);margin-top:3px;margin-left:22px">适用于豆包、DeepSeek 等支持思考控制的模型。开启后跳过推理过程直接输出答案。</p>
     </div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="testApiConnection()" id="btn-test-api" style="background:var(--gray-100)">🔌 测试连接</button>

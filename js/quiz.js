@@ -21,7 +21,15 @@ function updateQuizSetup() {
       pool = getAllQuestionsFromNode(selNodeId);
     }
     if (!quizTypeFilter.has('all')) pool = pool.filter(function (q) { return quizTypeFilter.has(q.type); });
-    avail.textContent = '（可用：' + pool.length + '题）';
+    if (quizState.mode === 'wrong') {
+      var wrongPool = pool.filter(function (q) { return q.stats && q.stats.wrong > 0; });
+      avail.textContent = '（错题：' + wrongPool.length + '题）';
+    } else {
+      avail.textContent = '（可用：' + pool.length + '题）';
+      var countEl = document.getElementById('quiz-count');
+      countEl.value = pool.length;
+      countEl.max = pool.length;
+    }
   } else avail.textContent = '';
 }
 
@@ -83,6 +91,13 @@ function toggleQuizType(type, el) {
 function selectQuizMode(mode, el) {
   quizState.mode = mode;
   document.querySelectorAll('.mode-btn').forEach(function (b) { b.classList.toggle('active', b.dataset.mode === mode); });
+  var countField = document.getElementById('quiz-count-field');
+  if (mode === 'wrong') {
+    countField.style.display = 'none';
+  } else {
+    countField.style.display = '';
+  }
+  updateQuizSetup();
 }
 
 function renderQuizSetup() {
@@ -105,6 +120,12 @@ function renderQuizSetup() {
     document.querySelectorAll('.qtc').forEach(function (b) { b.classList.add('active'); });
     quizTypeFilter = new Set(['all', 'choice', 'multi', 'judge', 'fill', 'short']);
   }
+  var countField = document.getElementById('quiz-count-field');
+  if (quizState.mode === 'wrong') {
+    countField.style.display = 'none';
+  } else {
+    countField.style.display = '';
+  }
   updateQuizSetup();
 }
 
@@ -122,9 +143,14 @@ function startQuiz() {
   if (!quizTypeFilter.has('all')) pool = pool.filter(function (q) { return quizTypeFilter.has(q.type); });
   if (!pool.length) return toast('所选类型暂无题目', 'warning');
 
+  if (quizState.mode === 'wrong') {
+    pool = pool.filter(function (q) { return q.stats && q.stats.wrong > 0; });
+    if (!pool.length) return toast('没有做错的题目！', 'success');
+  }
+
   // Shuffle or sort
   pool = [].concat(pool);
-  if (quizState.mode === 'random') {
+  if (quizState.mode === 'random' || quizState.mode === 'wrong') {
     for (var i = pool.length - 1; i > 0; i--) {
       var j = Math.floor(Math.random() * (i + 1));
       var tmp = pool[i]; pool[i] = pool[j]; pool[j] = tmp;
@@ -137,7 +163,7 @@ function startQuiz() {
       return aFav - bFav;
     });
   }
-  if (count > 0 && count < pool.length) pool = pool.slice(0, count);
+  if (quizState.mode !== 'wrong' && count > 0 && count < pool.length) pool = pool.slice(0, count);
 
   quizState.questions = pool;
   quizState.currentIdx = 0;

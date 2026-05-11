@@ -148,39 +148,94 @@ function aiParseText() {
   var btn = document.getElementById('btn-ai-parse');
   btn.textContent = '⏳ AI解析中...'; btn.disabled = true;
   var cfg = getApiConfig();
-  var prompt = '你是一个题目解析助手。请从以下文本中提取所有题目，以JSON数组格式返回，不要包含其他文字。\n\n每个题目格式：\n{\n  "type": "choice" | "multi" | "judge" | "fill" | "short",\n  "question": "题干",\n  "options": [{"label":"A","text":"选项内容"}],\n  "answer": "正确答案",\n  "explanation": "解析内容"\n}\n\n规则：\n- 单选题type为choice，多选题type为multi，判断题type为judge，填空题type为fill，简答题type为short\n- 选择题(choice/multi)必须提取选项(A/B/C/D)\n- 单选题答案为一个字母(A/B/C/D)，多选题答案为多个字母连写(如"ABD")\n- 判断题答案为"正确"或"错误"\n- 填空题答案为关键词语\n- 忽略页眉页脚和无关信息\n- 解析内容可能为空\n\n文本内容：\n' + text;
+
+  var systemPrompt = '你是一个专业的题目解析助手，从用户提供的文本中提取所有题目，返回JSON数组。\n\n' +
+    '核心规则（严格遵守）：\n' +
+    '1. 题干(question) = 纯题目文字，不要把答案、选项、解析混入题干\n' +
+    '2. 答案(answer) = 从文本中准确提取正确答案。选择题只保留字母(A/B/C/D)，多选题字母连写如"ABD"。判断题只写"正确"或"错误"。填空/简答写关键词语\n' +
+    '3. 选项(options) = 仅选择题需要，每个选项{label, text}，文本完整提取\n' +
+    '4. 如果原文同时出现"我的答案"和"正确答案"，以"正确答案"为准\n' +
+    '5. 类型(type)：choice=单选, multi=多选, judge=判断, fill=填空, short=简答\n' +
+    '6. 解析(explanation) = 提取原文中的答案解析，没有则为空字符串""\n\n' +
+    '输出格式：只返回一个```json代码块，不要任何其他说明文字。';
+
+  var body = {
+    model: cfg.model,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: '请解析以下文本中的题目：\n\n' + text }
+    ],
+    max_tokens: 4096,
+    temperature: 0.1
+  };
+  if (typeof chatFastMode !== 'undefined' && chatFastMode) {
+    body.thinking = { type: 'disabled' };
+  }
 
   fetch(cfg.endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + cfg.key },
-    body: JSON.stringify({
-      model: cfg.model,
-      messages: [{ role: 'user', content: prompt }],
-      max_tokens: 4096,
-      temperature: 0.1
-    })
+    body: JSON.stringify(body)
   }).then(function (r) {
     if (!r.ok) throw new Error('API请求失败(HTTP ' + r.status + ')');
     return r.json();
   }).then(function (data) {
     var content = '';
     if (data.choices && data.choices[0]) content = data.choices[0].message.content;
-    else if (data.content && data.content[0]) content = data.content[0].text;
     else throw new Error('无法解析API响应');
-    var jsonMatch = content.match(/\[[\s\S]*\]/);
-    if (!jsonMatch) throw new Error('AI返回格式异常，未找到JSON数组');
-    var questions = JSON.parse(jsonMatch[0]);
-    if (!Array.isArray(questions) || !questions.length) throw new Error('未解析出题目');
+
+    // 1. Try ```json code block first (standard AI output format)
+    var jsonStr = '';
+    var codeMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (codeMatch) {
+      jsonStr = codeMatch[1].trim();
+    } else {
+      // 2. Try bare JSON array
+      var arrMatch = content.match(/\[[\s\S]*\]/);
+      if (arrMatch) jsonStr = arrMatch[0];
+    }
+    if (!jsonStr) throw new Error('AI返回格式异常，未找到JSON数据');
+
+    // 3. Use fixJSON for robust parsing (8-layer auto-fix)
+    var fixResult = fixJSON(jsonStr);
+    if (!fixResult.success || !fixResult.output) {
+      throw new Error('JSON解析失败：' + (fixResult.error || '未知错误'));
+    }
+
+    // 4. Handle both array and {questions:[...]} wrapper
+    var questions = Array.isArray(fixResult.output) ? fixResult.output : (fixResult.output.questions || []);
+    if (!questions.length) throw new Error('未解析出题目');
+
+    // 5. Normalize each question
     questions.forEach(function (q) {
       if (!q.type) q.type = 'choice';
       if (!q.explanation) q.explanation = '';
       if (!q.options) q.options = [];
       if (!q.answer) q.answer = '';
       if (!q.stats) q.stats = { attempts: 0, correct: 0, wrong: 0 };
+      // Strip "正确答案：X" from answer field if AI mistakenly included it
+      var correctMatch = (q.answer || '').match(/正确答案[：:]\s*(.+)/);
+      if (correctMatch) q.answer = correctMatch[1].trim();
+      // Normalize choice answer: ensure single uppercase letter
+      if ((q.type === 'choice' || q.type === 'judge') && q.options && q.options.length) {
+        var letterMatch = (q.answer || '').match(/[A-Da-d]/);
+        if (letterMatch) q.answer = letterMatch[0].toUpperCase();
+      }
+      // Normalize multi answer: remove non-letter chars, uppercase
+      if (q.type === 'multi' && q.options && q.options.length && q.answer) {
+        q.answer = q.answer.replace(/[^A-Za-z]/g, '').toUpperCase();
+      }
+      // Normalize type from answer content
+      if (!q.type || q.type === 'choice') {
+        if (q.answer === '正确' || q.answer === '错误') q.type = 'judge';
+      }
     });
+
     var preview = document.getElementById('import-preview-text');
+    var fixNote = (fixResult.fixes && fixResult.fixes.length && fixResult.fixes[0] !== '完美解析')
+      ? ' <span style="font-size:11px;color:var(--warning)">（JSON自动修复：' + fixResult.fixes.join(' → ') + '）</span>' : '';
     var previewHtml = '<div style="margin:10px 0;padding:8px 14px;background:#f0fdf4;border-radius:6px;color:#166534;font-size:13px">';
-    previewHtml += '✅ AI解析出 ' + questions.length + ' 道题';
+    previewHtml += '✅ AI解析出 ' + questions.length + ' 道题' + fixNote;
     previewHtml += '<button class="btn-primary btn-sm" style="margin-left:8px" onclick="importParsedQuestions()">确认导入</button>';
     previewHtml += '<button class="btn-outline btn-sm" style="margin-left:4px" onclick="document.getElementById(\'import-preview-text\').innerHTML=\'\'">取消</button>';
     previewHtml += '</div><div class="preview-list">';
@@ -196,8 +251,14 @@ function aiParseText() {
     window._parsedQ = questions;
     toast('AI解析完成！', 'success');
   }).catch(function (e) {
-    toast('AI解析失败：' + e.message + '，尝试正则解析', 'warning');
-    parseTextImport();
+    var preview = document.getElementById('import-preview-text');
+    preview.innerHTML =
+      '<div style="margin:10px 0;padding:8px 14px;background:#fef2f2;border-radius:6px;color:#991b1b;font-size:13px">' +
+        '❌ AI解析失败：' + escHtml(e.message) +
+        '<button class="btn-outline btn-sm" style="margin-left:8px" onclick="parseTextImport()">改用正则解析</button>' +
+        '<button class="btn-outline btn-sm" style="margin-left:4px" onclick="document.getElementById(\'import-preview-text\').innerHTML=\'\'">关闭</button>' +
+      '</div>';
+    toast('AI解析失败：' + e.message, 'error');
   }).finally(function () {
     btn.textContent = '🤖 AI 智能解析'; btn.disabled = false;
   });

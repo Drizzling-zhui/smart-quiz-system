@@ -10,6 +10,7 @@ var chatWidth = 350;       // current panel width
 var chatMinWidth = 260;    // minimum width
 var chatMaxWidth = 700;    // maximum width
 var chatResizing = false;
+var chatFastMode = false;  // fast mode: skip thinking/reasoning
 
 function loadChatWidth() {
   try {
@@ -20,6 +21,17 @@ function loadChatWidth() {
 
 function saveChatWidth() {
   try { localStorage.setItem('quiz_app_chat_width', String(chatWidth)); } catch (e) {}
+}
+
+function loadChatFastMode() {
+  try {
+    var saved = localStorage.getItem('quiz_app_fast_mode');
+    chatFastMode = saved === 'true';
+  } catch (e) { chatFastMode = false; }
+}
+
+function saveChatFastMode() {
+  try { localStorage.setItem('quiz_app_fast_mode', String(chatFastMode)); } catch (e) {}
 }
 
 function loadChatHistory() {
@@ -62,6 +74,24 @@ function toggleChat() {
   }
 }
 
+function toggleFastMode() {
+  chatFastMode = !chatFastMode;
+  saveChatFastMode();
+  var btn = document.getElementById('btn-fast-mode');
+  if (btn) {
+    btn.classList.toggle('active', chatFastMode);
+    btn.title = chatFastMode ? '快速模式：已开启' : '快速模式：已关闭';
+  }
+}
+
+function updateFastModeBtn() {
+  var btn = document.getElementById('btn-fast-mode');
+  if (btn) {
+    btn.classList.toggle('active', chatFastMode);
+    btn.title = chatFastMode ? '快速模式：已开启' : '快速模式：已关闭';
+  }
+}
+
 // ============================================================
 // RESIZE HANDLE
 // ============================================================
@@ -83,7 +113,6 @@ function initChatResize() {
 
   document.addEventListener('mousemove', function (e) {
     if (!chatResizing) return;
-    // Calculate width: mouse X from the right edge of the viewport
     var newWidth = window.innerWidth - e.clientX;
     newWidth = Math.max(chatMinWidth, Math.min(chatMaxWidth, newWidth));
     chatWidth = newWidth;
@@ -124,7 +153,7 @@ function setChatContext(qId) {
     '<span class="ctx-label">📌 题目</span>' +
     '<span class="ctx-text">' + escHtml(q.question.slice(0, 30)) + (q.question.length > 30 ? '…' : '') + '</span>' +
     '<button onclick="clearChatContext()" class="ctx-close">✕</button>' +
-    '<button onclick="askAIAboutQuestion(' + q.id + ')" class="ctx-parse-btn">✨ 一键解析</button>';
+    '<button onclick="askAIAboutQuestion(' + q.id + ')" class="ctx-parse-btn">一键解析</button>';
 }
 
 function clearChatContext() {
@@ -189,33 +218,106 @@ function sendChatMessage(text) {
   msgs = msgs.concat(chatState.messages.slice(-20));
 
   chatState.loading = true;
+  window._chatReasoning = '';
   renderChatMessages();
+
+  var body = {
+    model: cfg.model,
+    messages: msgs,
+    max_tokens: 2048,
+    temperature: 0.3,
+    stream: true
+  };
+  // Fast mode: disable deep thinking for compatible APIs (Doubao/DeepSeek)
+  if (chatFastMode) {
+    body.thinking = { type: 'disabled' };
+  }
 
   fetch(cfg.endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + cfg.key },
-    body: JSON.stringify({
-      model: cfg.model,
-      messages: msgs,
-      max_tokens: 2048,
-      temperature: 0.3
-    })
+    body: JSON.stringify(body)
   }).then(function (r) {
     if (!r.ok) throw new Error('API请求失败(HTTP ' + r.status + ')');
-    return r.json();
-  }).then(function (data) {
-    var content = '';
-    if (data.choices && data.choices[0]) content = data.choices[0].message.content;
-    else if (data.content && data.content[0]) content = data.content[0].text;
-    else throw new Error('无法解析API响应');
-    chatState.messages.push({ role: 'assistant', content: content });
+    return readStream(r);
   }).catch(function (e) {
     chatState.messages.push({ role: 'assistant', content: '抱歉，请求失败：' + e.message });
-  }).finally(function () {
     chatState.loading = false;
     renderChatMessages();
     saveChatHistory();
   });
+}
+
+function readStream(response) {
+  var reader = response.body.getReader();
+  var decoder = new TextDecoder();
+  var buffer = '';
+  var content = '';
+
+  function read() {
+    reader.read().then(function (result) {
+      if (result.done) {
+        // Stream complete
+        chatState.messages.push({ role: 'assistant', content: content });
+        chatState.loading = false;
+        renderChatMessages();
+        saveChatHistory();
+        return;
+      }
+      buffer += decoder.decode(result.value, { stream: true });
+      var lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+      for (var i = 0; i < lines.length; i++) {
+        var line = lines[i];
+        if (line.indexOf('data: ') !== 0) continue;
+        var data = line.slice(6).trim();
+        if (data === '[DONE]') continue;
+        try {
+          var json = JSON.parse(data);
+          var delta = (json.choices && json.choices[0] && json.choices[0].delta) || {};
+          if (delta.content) content += delta.content;
+          // Handle reasoning_content from deep-thinking models
+          if (delta.reasoning_content) {
+            if (!window._chatReasoning) window._chatReasoning = '';
+            window._chatReasoning += delta.reasoning_content;
+          }
+          updateStreamingContent(content);
+        } catch (e) {}
+      }
+      read();
+    }).catch(function (e) {
+      if (content) {
+        chatState.messages.push({ role: 'assistant', content: content });
+      } else {
+        chatState.messages.push({ role: 'assistant', content: '请求失败：' + e.message });
+      }
+      chatState.loading = false;
+      renderChatMessages();
+      saveChatHistory();
+    });
+  }
+  read();
+}
+
+function updateStreamingContent(content) {
+  var container = document.getElementById('chat-messages');
+  // Remove the loading dots placeholder
+  var loadingEl = container.querySelector('.chat-msg.loading');
+  if (loadingEl) loadingEl.remove();
+  // Update or create streaming element
+  var streamEl = container.querySelector('.chat-msg.streaming');
+  if (!streamEl) {
+    streamEl = document.createElement('div');
+    streamEl.className = 'chat-msg assistant streaming';
+    container.appendChild(streamEl);
+  }
+  var html = renderMD(content);
+  // Show reasoning in a collapsible block if present
+  if (window._chatReasoning) {
+    html = '<details class="reasoning-block" open><summary>💭 思考过程</summary>' + renderMD(window._chatReasoning) + '</details>' + html;
+  }
+  streamEl.innerHTML = html;
+  container.scrollTop = container.scrollHeight;
 }
 
 function renderChatMessages() {
@@ -226,7 +328,7 @@ function renderChatMessages() {
     html += '<div class="chat-msg ' + msg.role + '">' + body + '</div>';
   });
   if (chatState.loading) {
-    html += '<div class="chat-msg assistant"><span class="loading-dots">思考中<span>.</span><span>.</span><span>.</span></span></div>';
+    html += '<div class="chat-msg assistant loading"><span class="loading-dots">思考中<span>.</span><span>.</span><span>.</span></span></div>';
   }
   container.innerHTML = html;
   container.scrollTop = container.scrollHeight;
@@ -244,4 +346,5 @@ function clearChat() {
 
 loadChatWidth();
 loadChatHistory();
+loadChatFastMode();
 initChatResize();

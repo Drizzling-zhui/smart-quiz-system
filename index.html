@@ -19,6 +19,7 @@
       <button onclick="exportData()">📤 导出</button>
       <button onclick="showApiSettings()" title="API设置">⚙️</button>
     </div>
+    <div id="sync-status" style="padding:4px 14px;font-size:11px;text-align:center"></div>
     <div id="subject-list"></div>
     <div class="sidebar-footer">
       <button onclick="promptNewSubject()">＋ 添加学科</button>
@@ -279,6 +280,19 @@
   </div>
 </div>
 
+<!-- Data Sync Banner -->
+<div class="banner-overlay" id="banner-data-sync" style="display:none">
+  <div class="banner">
+    <div class="b-icon">📂</div>
+    <h2>发现本地题库数据</h2>
+    <p>本地文件夹中有较新的题库数据，可能来自外部编辑。<br>是否同步到前端？</p>
+    <div class="b-btns">
+      <button class="b-primary b-sync-action">📥 同步到前端</button>
+      <button class="b-skip b-sync-ignore">忽略</button>
+    </div>
+  </div>
+</div>
+
 <!-- Settings Modal -->
 <div class="modal-overlay" id="modal-settings">
   <div class="modal" style="max-width:520px">
@@ -333,6 +347,7 @@
 <script src="js/import.js"></script>
 <script src="js/quiz.js"></script>
 <script src="js/chat.js"></script>
+<script src="js/storage.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

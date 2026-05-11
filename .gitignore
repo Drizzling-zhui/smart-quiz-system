@@ -5,3 +5,6 @@ Thumbs.db
 *.tmp
 *.bak
 CLAUDE.md
+data/subjects/*.json
+data/subjects/**/*.json
+data/_data.json

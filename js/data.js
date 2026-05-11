@@ -73,6 +73,7 @@ function loadData() {
 
 function saveData() {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(appData, null, 2)); } catch (e) {}
+  if (typeof backupToFile === 'function') backupToFile();
 }
 
 function getSubject(name) {

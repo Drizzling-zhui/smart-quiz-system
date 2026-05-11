@@ -440,8 +440,8 @@ function finishQuiz() {
       '<div class="rv-question">' + (i + 1) + '. ' + escHtml(q.question) + '</div>' +
       '<div class="rv-answer">' +
         ((q.type === 'choice' || q.type === 'multi' || q.type === 'judge')
-          ? '你的答案：<span style="' + (isCorrect ? 'color:var(--success)' : isWrong ? 'color:var(--danger);text-decoration:line-through' : 'color:var(--gray-400)') + '">' + escHtml(ua || '未作答') + '</span> · 正确答案：<span style="color:var(--success);font-weight:600">' + escHtml(q.answer) + '</span>'
-          : '你的答案：<span style="' + (isCorrect ? 'color:var(--success)' : isWrong ? 'color:var(--danger);text-decoration:line-through' : 'color:var(--gray-400)') + '">' + escHtml(ua || '未作答') + '</span> · 参考答案：<span style="color:var(--success);font-weight:600">' + escHtml(q.answer) + '</span>'
+          ? '你的答案：<span style="' + (isCorrect ? 'color:var(--success)' : isWrong ? 'color:var(--danger)' : 'color:var(--gray-400)') + '">' + escHtml(ua || '未作答') + '</span> · 正确答案：<span style="color:var(--success);font-weight:600">' + escHtml(q.answer) + '</span>'
+          : '你的答案：<span style="' + (isCorrect ? 'color:var(--success)' : isWrong ? 'color:var(--danger)' : 'color:var(--gray-400)') + '">' + escHtml(ua || '未作答') + '</span> · 参考答案：<span style="color:var(--success);font-weight:600">' + escHtml(q.answer) + '</span>'
         ) +
         (q.explanation ? '<br>💡 ' + escHtml(q.explanation) : '') +
         (att > 1 ? '<br><span class="rv-attempts">提交了 ' + att + ' 次</span>' : '') +

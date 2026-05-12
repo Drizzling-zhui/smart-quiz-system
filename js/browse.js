@@ -96,24 +96,31 @@ function renderBrowse() {
     }).join('') : '';
 
     var st = q.stats || { attempts: 0, correct: 0, wrong: 0 };
-    var acc = st.attempts > 0 ? Math.round(st.correct / st.attempts * 100) : -1;
-    var accCls = 'stat-badge acc';
-    if (acc >= 0) accCls += acc >= 80 ? ' high' : acc >= 50 ? ' medium' : ' low';
+    var total = st.attempts || 0;
+    var correct = st.correct || 0;
+    var wrong = st.wrong || 0;
+    var acc = total > 0 ? Math.round(correct / total * 100) : -1;
+    var accColor = acc >= 80 ? 'var(--success)' : acc >= 50 ? 'var(--warning)' : 'var(--danger)';
+    var accBg = acc >= 80 ? '#f0fdf4' : acc >= 50 ? '#fffbeb' : '#fef2f2';
+    var accEmoji = acc >= 80 ? '🎯' : acc >= 50 ? '📊' : '💪';
 
     return '<div class="q-card">' +
       '<div class="q-header">' +
         (isFav ? '<span style="cursor:pointer;font-size:14px" onclick="toggleFavorite(' + q.id + ');renderBrowse()" title="取消收藏">⭐</span>' : '<span style="cursor:pointer;font-size:14px;opacity:0.3" onclick="toggleFavorite(' + q.id + ');renderBrowse()" title="收藏">☆</span>') +
         '<span class="q-number">#' + (idx + 1) + '</span>' +
         '<span class="q-type ' + q.type + '">' + tm[q.type] + '</span>' +
+        (q.aiGenerated ? '<span style="font-size:10px;background:#dbeafe;color:#1e40af;padding:2px 6px;border-radius:3px;margin-left:4px" title="答案由AI生成，仅供参考">🤖 AI答案</span>' : '') +
       '</div>' +
       '<div class="q-text">' + escHtml(q.question) + '</div>' +
       (optsHtml ? '<div class="q-options">' + optsHtml + '</div>' : '') +
-      (st.attempts > 0 ? '<div class="q-stats">' +
-        '<span class="stat-badge attempt">📝 ' + st.attempts + '次</span>' +
-        '<span class="stat-badge wrong">❌ ' + st.wrong + '次错</span>' +
-        '<span class="' + accCls + '">' + (acc >= 0 ? '✅ ' + acc + '%' : '') + '</span>' +
-      '</div>' : '<div class="q-stats"><span class="stat-badge" style="color:var(--gray-300)">尚未答题</span></div>') +
+      '<div class="q-stats">' +
+        (total > 0 ?
+          '<span class="stat-acc-pill" style="background:' + accBg + ';color:' + accColor + ';border:1px solid ' + accColor + '">' + accEmoji + ' 正确率 ' + acc + '%</span>' +
+          '<span class="stat-detail">共答 ' + total + ' 次 · 对 ' + correct + ' 次 · 错 ' + wrong + ' 次</span>'
+          : '<span class="stat-detail" style="color:var(--gray-300)">尚未答题</span>') +
+      '</div>' +
       '<div class="q-footer">' +
+        '<button class="btn-notes' + (q.notes ? ' has-notes' : '') + '" onclick="event.stopPropagation();openNotes(' + q.id + ')" title="' + (q.notes ? '点击查看/编辑备注' : '添加备注') + '">📝 ' + (q.notes ? '有备注' : '备注') + '</button>' +
         '<button class="ask-ai" onclick="event.stopPropagation();openChat();setChatContext(' + q.id + ');askAIAboutQuestion(' + q.id + ')">🤖 问AI</button>' +
         '<button class="edit" onclick="editQuestion(' + q.id + ')">✏️ 编辑</button>' +
         '<button class="del" onclick="confirmAction(\'确定删除此题？\',function(){deleteQuestion(' + q.id + ')})">🗑️ 删除</button>' +
@@ -178,6 +185,29 @@ function deleteQuestion(qId) {
   if (favIdx >= 0) { favorites.splice(favIdx, 1); saveFavorites(); }
   saveData(); renderBrowse(); renderSidebar();
   toast('题目已删除', 'info');
+}
+
+// Notes
+var _currentNotesQId = null;
+
+function openNotes(qId) {
+  var q = findQuestionById(qId);
+  if (!q) return;
+  _currentNotesQId = qId;
+  document.getElementById('notes-question-preview').textContent = (q.question || '').slice(0, 120) + ((q.question || '').length > 120 ? '...' : '');
+  document.getElementById('notes-textarea').value = q.notes || '';
+  document.getElementById('modal-notes').classList.add('active');
+}
+
+function saveNotes() {
+  if (!_currentNotesQId) return;
+  var q = findQuestionById(_currentNotesQId);
+  if (!q) return;
+  q.notes = document.getElementById('notes-textarea').value.trim();
+  saveData();
+  renderBrowse(); // refresh notes button state
+  hideModal('notes');
+  toast(q.notes ? '备注已保存' : '备注已清除', 'info');
 }
 
 function resetAllStats() {

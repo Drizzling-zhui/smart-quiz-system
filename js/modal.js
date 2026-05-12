@@ -15,6 +15,8 @@ function showModal(type, data) {
     document.querySelectorAll('.multi-ans').forEach(function (cb) { cb.checked = false; });
     document.getElementById('q-explain-input').value = '';
     document.querySelectorAll('.opt-input').forEach(function (i) { i.value = ''; });
+    var aiNote = document.getElementById('q-ai-note');
+    if (aiNote) aiNote.style.display = 'none';
     toggleQuestionModalOptions();
     // Reset to single-add tab
     switchModalTab('single', document.querySelector('[data-mtab="single"]'));
@@ -110,8 +112,11 @@ function saveQuestion() {
   }
   var qData = { type: type, question: question, options: options, answer: answer, explanation: explanation };
   if (editingQuestionId) {
+    // If user edited the answer, clear AI-generated flag
+    var oldQ = findQuestionById(editingQuestionId);
+    if (oldQ && oldQ.aiGenerated && oldQ.answer !== answer) qData.aiGenerated = false;
     updateQuestion(currentSubject, editingQuestionId, qData);
-    toast('题目已更新', 'success');
+    toast(oldQ && oldQ.aiGenerated && qData.aiGenerated === false ? '题目已更新（AI答案已清除）' : '题目已更新', 'success');
   } else {
     addQuestion(currentSubject, qData);
     toast('题目已添加', 'success');
@@ -136,10 +141,13 @@ function editQuestion(qId) {
   if (!q) return;
   currentNodeId = fileNodeId;
   editingQuestionId = qId;
-  document.getElementById('modal-q-title').textContent = '编辑题目';
+  document.getElementById('modal-q-title').textContent = '编辑题目' + (q.aiGenerated ? '（AI生成答案）' : '');
   document.getElementById('q-type-select').value = q.type;
   document.getElementById('q-text-input').value = q.question;
   document.getElementById('q-explain-input').value = q.explanation || '';
+  // Show AI-generated warning near answer
+  var aiNoteEl = document.getElementById('q-ai-note');
+  if (aiNoteEl) aiNoteEl.style.display = q.aiGenerated ? 'block' : 'none';
   if ((q.type === 'choice' || q.type === 'multi') && q.options) {
     document.querySelectorAll('.opt-input').forEach(function (inp, i) { inp.value = q.options[i] ? q.options[i].text : ''; });
     if (q.type === 'multi') {

@@ -19,7 +19,7 @@
       <button onclick="exportData()">📤 导出</button>
       <button onclick="showApiSettings()" title="API设置">⚙️</button>
     </div>
-    <div id="sync-status" style="padding:4px 14px;font-size:11px;text-align:center"></div>
+    <div id="sync-status" style="padding:4px 14px;font-size:11px;text-align:center;cursor:pointer" onclick="showApiSettings()" title="点击打开设置管理数据目录"></div>
     <div id="subject-list"></div>
     <div class="sidebar-footer">
       <button onclick="promptNewSubject()">＋ 添加学科</button>
@@ -198,6 +198,7 @@
           <select id="q-answer-judge-select"><option value="正确">正确 ✅</option><option value="错误">错误 ❌</option></select>
         </div>
         <textarea id="q-answer-text" style="display:none" rows="2" placeholder="输入答案内容..."></textarea>
+        <div id="q-ai-note" style="display:none;margin-top:4px;padding:4px 8px;background:#fef3c7;color:#92400e;border-radius:4px;font-size:11px">⚠️ 此题答案由AI生成，仅供参考。修改答案后将自动清除此标记。</div>
       </div>
       <div class="field"><label>解析（可选）</label><textarea id="q-explain-input" rows="2" placeholder="题目解析..."></textarea></div>
       <div class="modal-actions">
@@ -209,6 +210,7 @@
       <div style="margin-bottom:8px">
         <button class="modal-subtab active" data-mstab="text" onclick="switchModalSubTab('text',this)">📄 文本解析</button>
         <button class="modal-subtab" data-mstab="json" onclick="switchModalSubTab('json',this)">📋 JSON导入</button>
+        <button class="modal-subtab" data-mstab="file" onclick="switchModalSubTab('file',this)">📁 文件导入</button>
       </div>
       <div class="mstab-content active" id="mstab-text">
         <p style="font-size:12px;color:var(--gray-500);margin-bottom:6px">粘贴从学习平台复制的题目文本，自动解析为标准格式</p>
@@ -229,6 +231,36 @@
           <button class="btn-outline" onclick="document.getElementById('import-json').value=''">清空</button>
         </div>
         <div id="import-preview-json"></div>
+      </div>
+      <div class="mstab-content" id="mstab-file">
+        <p style="font-size:12px;color:var(--gray-500);margin-bottom:6px">支持 PDF、Word (.docx)、图片 (.png/.jpg)，自动提取文字后交给 AI 解析</p>
+        <div class="file-drop-zone" id="file-drop-zone">
+          <div class="file-drop-inner">
+            <span style="font-size:28px">📁</span>
+            <span style="font-size:13px;color:var(--gray-600)">拖拽文件到此处，或点击选择</span>
+            <span style="font-size:11px;color:var(--gray-400)">支持 PDF / Word / 图片</span>
+            <input type="file" id="import-file-input" accept=".pdf,.docx,.png,.jpg,.jpeg,.webp,.bmp" onchange="handleFileImport(this.files[0])" style="display:none">
+            <button class="btn-outline btn-sm" onclick="document.getElementById('import-file-input').click()" style="margin-top:6px">选择文件</button>
+          </div>
+        </div>
+        <div id="file-extract-status" style="display:none;margin-top:8px;padding:8px 12px;background:var(--gray-50);border-radius:6px;font-size:12px"></div>
+        <div id="file-extracted-text" style="display:none;margin-top:8px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+            <span style="font-size:12px;font-weight:600">提取的文字内容：</span>
+            <button class="btn-outline btn-sm" onclick="document.getElementById('file-extracted-text').style.display='none';document.getElementById('import-file-input').value=''">清除</button>
+          </div>
+          <textarea id="file-text-preview" rows="8" readonly style="width:100%;font-size:12px;background:var(--gray-50)"></textarea>
+          <div class="import-actions" style="margin-top:6px">
+            <button class="btn-success" onclick="aiParseFileText()" id="btn-ai-parse-file">🤖 AI 智能解析</button>
+            <button class="btn-outline" onclick="parseFileTextRegex()">🔍 正则解析</button>
+          </div>
+          <div id="import-preview-file"></div>
+        </div>
+        <div id="file-no-answer-banner" style="display:none;margin-top:8px;padding:8px 12px;background:#fffbeb;border:1px solid #fde68a;border-radius:6px;font-size:12px;color:#92400e">
+          ⚠️ 检测到部分题目没有答案，可以尝试
+          <button class="btn-sm" style="background:#f59e0b;color:#fff;border:none;border-radius:4px;padding:3px 10px;cursor:pointer;margin:0 4px" onclick="aiGenerateAnswers()" id="btn-ai-gen-answers">AI 生成答案</button>
+          <span style="font-size:11px;color:var(--gray-500)">（AI生成的答案仅供参考，不一定准确）</span>
+        </div>
       </div>
       <div class="import-help">
         <strong>📖 格式说明</strong><br>
@@ -258,21 +290,31 @@
   </div>
 </div>
 
+<!-- Notes Modal -->
+<div class="modal-overlay" id="modal-notes">
+  <div class="modal" style="max-width:520px">
+    <h3>📝 题目备注</h3>
+    <p id="notes-question-preview" style="font-size:13px;color:var(--gray-600);margin-bottom:12px;padding:8px 12px;background:var(--gray-50);border-radius:6px;line-height:1.5"></p>
+    <div class="field">
+      <label>备注内容（解题方法、灵感记录）</label>
+      <textarea id="notes-textarea" rows="6" placeholder="记录解题思路、记忆技巧、常见错误等..."></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="hideModal('notes')">取消</button>
+      <button class="btn-confirm" onclick="saveNotes()">保存备注</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast-container" id="toast-container"></div>
 
-<!-- Announcement Banner -->
+<!-- API Config Prompt (shown when API not configured) -->
 <div class="banner-overlay" id="banner-api">
   <div class="banner">
     <div class="b-icon">🤖</div>
-    <h2>发现 AI 智能解析</h2>
-    <p>你粘贴的题目文本格式多种多样，正则解析总有遗漏。<br>配置 AI 接口后，系统能用大模型理解任意格式的文本，<br>自动提取题目、选项、答案和解析。</p>
-    <div class="b-features">
-      <li><strong>精准识别</strong> — 无论是超星/学习通、题库文档还是截图OCR文字，AI都能理解</li>
-      <li><strong>任意格式</strong> — 不依赖固定模板，自由排版也能正确提取</li>
-      <li><strong>兼容多种API</strong> — 支持任意 OpenAI 兼容接口（DeepSeek、通义千问、Claude、GPT等）</li>
-      <li><strong>一键导入</strong> — 解析结果预览确认后直接入库</li>
-    </div>
-    <p style="font-size:12px;color:var(--gray-400)">API 密钥仅存储在浏览器本地，不会上传到第三方服务器</p>
+    <h2>配置 API 以启用 AI 功能</h2>
+    <p>AI 智能解析、文件导入、AI 对话等功能需要配置 API。<br>支持所有 OpenAI 兼容接口（DeepSeek、通义千问、豆包等）。</p>
+    <p style="font-size:12px;color:var(--gray-400)">完整使用教程在设置页面中，API 密钥仅存储在浏览器本地。</p>
     <div class="b-btns">
       <button class="b-primary" onclick="closeBannerAndOpenSettings()">去配置 API</button>
       <button class="b-skip" onclick="hideBanner()">暂时跳过</button>
@@ -295,42 +337,106 @@
 
 <!-- Settings Modal -->
 <div class="modal-overlay" id="modal-settings">
-  <div class="modal" style="max-width:520px">
-    <h3>⚙️ API 设置</h3>
-    <p style="font-size:13px;color:var(--gray-500);margin-bottom:14px">配置 AI 接口后可启用智能解析，支持任意兼容 OpenAI 格式的 API。</p>
-    <div class="field">
-      <label>API 地址</label>
-      <input type="text" id="api-endpoint" placeholder="https://api.openai.com/v1/chat/completions" value="https://api.openai.com/v1/chat/completions">
-    </div>
-    <div class="field">
-      <label>模型名称</label>
-      <input type="text" id="api-model" placeholder="gpt-4o" value="gpt-4o-mini">
-      <p style="font-size:11px;color:var(--gray-400);margin-top:3px">常用：gpt-4o-mini / deepseek-chat / claude-sonnet-4-20250514</p>
-    </div>
-    <div class="field">
-      <label>API 密钥</label>
-      <input type="password" id="api-key" placeholder="sk-..." style="font-family:monospace">
-      <p style="font-size:11px;color:var(--gray-400);margin-top:3px">仅存储在浏览器本地，安全可控</p>
-    </div>
-    <div class="field">
-      <label>API 配置说明</label>
-      <div style="font-size:12px;color:var(--gray-600);line-height:1.7;background:var(--gray-50);padding:10px 14px;border-radius:6px">
-        <strong>OpenAI</strong>：填入 https://api.openai.com/v1/chat/completions<br>
-        <strong>DeepSeek</strong>：https://api.deepseek.com/v1/chat/completions<br>
-        <strong>通义千问</strong>：https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions<br>
-        <strong>Claude (Anthropic)</strong>：https://api.anthropic.com/v1/messages（模型填 claude-sonnet-4-20250514）
+  <div class="modal" style="max-width:560px;max-height:85vh;overflow-y:auto">
+    <h3>⚙️ 设置与使用教程</h3>
+
+    <!-- Section: Tutorial (top) -->
+    <div class="settings-section">
+      <div class="settings-section-title">📖 使用教程</div>
+      <p style="font-size:11px;color:var(--gray-400);margin-bottom:12px">本教程位于设置页面中，随时可打开查看。</p>
+      <div class="tutorial-step">
+        <div class="tutorial-step-num">1</div>
+        <div class="tutorial-step-body">
+          <strong>配置 API</strong>
+          <p>在下方「API 配置」中填入接口地址、模型名称和密钥。支持所有兼容 OpenAI 格式的 API，如 DeepSeek、通义千问、豆包等。配置后可启用：</p>
+          <ul>
+            <li><strong>AI 智能解析</strong> — 在批量导入中粘贴任意格式题目文本，AI 自动提取</li>
+            <li><strong>AI 对话</strong> — 右侧对话面板，可针对单题提问；⚡ 快速模式在对话面板中切换</li>
+            <li><strong>文件导入</strong> — 从 PDF/Word/图片中提取题目</li>
+          </ul>
+        </div>
+      </div>
+      <div class="tutorial-step">
+        <div class="tutorial-step-num">2</div>
+        <div class="tutorial-step-body">
+          <strong>绑定本地文件夹（可选）</strong>
+          <p>在下方「本地数据目录」中选择 <code>data/subjects/</code> 文件夹，实现：</p>
+          <ul>
+            <li>每次修改题库自动备份到本地 JSON 文件</li>
+            <li>用 VS Code 等编辑器直接编辑 JSON 后，点击「一键同步」更新</li>
+            <li>JSON 文件按文件树结构存放，每个题库一个文件，方便维护</li>
+          </ul>
+        </div>
+      </div>
+      <div class="tutorial-step">
+        <div class="tutorial-step-num">3</div>
+        <div class="tutorial-step-body">
+          <strong>导入题目</strong>
+          <p>在题库文件上点击「＋」添加题目，或使用批量导入：</p>
+          <ul>
+            <li><strong>文本解析</strong> — 粘贴题目文本，正则或 AI 智能解析</li>
+            <li><strong>JSON 导入</strong> — 粘贴 JSON 数据，自动修复格式错误</li>
+            <li><strong>文件导入</strong> — 上传 PDF / Word / 图片，自动提取文字后 AI 解析</li>
+          </ul>
+        </div>
+      </div>
+      <div class="tutorial-step">
+        <div class="tutorial-step-num">4</div>
+        <div class="tutorial-step-body">
+          <strong>答题与复习</strong>
+          <p>在「答题模式」中选择顺序/随机/错题重刷，提交后即时判分。答题统计会记录每道题的正确率，错题可重刷巩固。</p>
+        </div>
       </div>
     </div>
-    <div class="field">
-      <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
-        <input type="checkbox" id="settings-fast-mode" onchange="chatFastMode=this.checked;saveChatFastMode();updateFastModeBtn()">
-        ⚡ 快速模式（禁用 AI 深度思考，响应更快）
-      </label>
-      <p style="font-size:11px;color:var(--gray-400);margin-top:3px;margin-left:22px">适用于豆包、DeepSeek 等支持思考控制的模型。开启后跳过推理过程直接输出答案。</p>
+
+    <!-- Section: API -->
+    <div class="settings-section">
+      <div class="settings-section-title">🔌 API 配置</div>
+      <p style="font-size:12px;color:var(--gray-500);margin-bottom:10px">配置 AI 接口后可启用智能解析，支持任意兼容 OpenAI 格式的 API。</p>
+      <div class="field">
+        <label>API 地址</label>
+        <input type="text" id="api-endpoint" placeholder="https://api.openai.com/v1/chat/completions">
+      </div>
+      <div class="field">
+        <label>模型名称</label>
+        <input type="text" id="api-model" placeholder="gpt-4o-mini">
+        <p style="font-size:11px;color:var(--gray-400);margin-top:3px">常用：gpt-4o-mini / deepseek-chat / claude-sonnet-4-20250514</p>
+      </div>
+      <div class="field">
+        <label>API 密钥</label>
+        <input type="password" id="api-key" placeholder="sk-..." style="font-family:monospace">
+        <p style="font-size:11px;color:var(--gray-400);margin-top:3px">仅存储在浏览器本地，安全可控</p>
+      </div>
+      <div style="margin-top:8px">
+        <button class="btn-cancel" onclick="testApiConnection()" id="btn-test-api" style="background:var(--gray-100);padding:7px 16px">🔌 测试连接</button>
+      </div>
     </div>
+
+    <!-- Section: Data Directory -->
+    <div class="settings-section">
+      <div class="settings-section-title">📁 本地数据目录</div>
+      <p style="font-size:12px;color:var(--gray-500);margin-bottom:10px">绑定本地文件夹后，题库数据自动双向同步。</p>
+      <div class="dir-picker" id="dir-picker">
+        <div class="dir-path" id="dir-path-display">
+          <span class="dir-icon">📁</span>
+          <span class="dir-text" id="dir-path-text">未绑定</span>
+        </div>
+        <div class="dir-actions">
+          <button onclick="pickDataDirectory()" id="btn-bind-dir">选择目录</button>
+          <button onclick="syncFromLocal()" id="btn-sync-now" style="display:none" title="从本地文件同步最新数据">🔄 一键同步</button>
+          <button onclick="releaseDataDirectory()" id="btn-unbind-dir" style="display:none">解除绑定</button>
+        </div>
+      </div>
+      <p style="font-size:11px;color:var(--gray-400);margin-top:6px;line-height:1.6">
+        选择本地 <code>data/subjects/</code> 文件夹后：<br>
+        · 每次修改题库会自动备份到本地（按文件树结构存放）<br>
+        · 外部编辑本地 JSON 后，点击「一键同步」立即更新<br>
+        · 数据仅存储在本地，不上传任何服务器
+      </p>
+    </div>
+
     <div class="modal-actions">
-      <button class="btn-cancel" onclick="testApiConnection()" id="btn-test-api" style="background:var(--gray-100)">🔌 测试连接</button>
-      <button class="btn-cancel" onclick="hideModal('settings')">取消</button>
+      <button class="btn-cancel" onclick="hideModal('settings')">关闭</button>
       <button class="btn-confirm" onclick="saveApiSettings()">保存</button>
     </div>
   </div>

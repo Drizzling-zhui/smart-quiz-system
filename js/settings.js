@@ -25,8 +25,7 @@ function showApiSettings() {
   document.getElementById('api-endpoint').value = cfg.endpoint;
   document.getElementById('api-model').value = cfg.model;
   document.getElementById('api-key').value = cfg.key;
-  var fastModeCb = document.getElementById('settings-fast-mode');
-  if (fastModeCb) fastModeCb.checked = !!chatFastMode;
+  if (typeof updateDirDisplay === 'function') updateDirDisplay();
   document.getElementById('modal-settings').classList.add('active');
 }
 

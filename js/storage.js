@@ -3,6 +3,7 @@
 // ============================================================
 var localDirHandle = null;
 var localSyncEnabled = false;
+var localDirName = '';
 
 // IndexedDB for persisting directory handle across page reloads
 function _openFSDB() {
@@ -49,18 +50,22 @@ function initFileSync() {
       if (state === 'granted') {
         localDirHandle = handle;
         localSyncEnabled = true;
+        localDirName = handle.name;
         updateSyncIndicator();
-        // Check if local file is newer than last backup
+        updateDirDisplay();
         checkLocalData();
       } else {
         return handle.requestPermission({ mode: 'readwrite' }).then(function (newState) {
           if (newState === 'granted') {
             localDirHandle = handle;
             localSyncEnabled = true;
+            localDirName = handle.name;
             updateSyncIndicator();
+            updateDirDisplay();
             checkLocalData();
           } else {
             updateSyncIndicator();
+            updateDirDisplay();
           }
         });
       }
@@ -76,8 +81,10 @@ function pickDataDirectory() {
   window.showDirectoryPicker({ mode: 'readwrite' }).then(function (handle) {
     localDirHandle = handle;
     localSyncEnabled = true;
+    localDirName = handle.name;
     _setStoredHandle(handle).then(function () {
       updateSyncIndicator();
+      updateDirDisplay();
       toast('已绑定本地文件夹，数据将自动同步', 'success');
       backupToFile();
     });
@@ -90,8 +97,10 @@ function pickDataDirectory() {
 function releaseDataDirectory() {
   localDirHandle = null;
   localSyncEnabled = false;
+  localDirName = '';
   _setStoredHandle(null).then(function () {
     updateSyncIndicator();
+    updateDirDisplay();
     toast('已解除本地文件夹绑定', 'info');
   });
 }
@@ -111,7 +120,7 @@ function _getFileHandle(dirHandle, pathParts) {
   });
 }
 
-// Write appData to local data/subjects/ folder
+// Write appData to local data/subjects/ folder (tree structure + full backup)
 function backupToFile() {
   if (!localDirHandle || !localSyncEnabled) return;
   var dirHandle = localDirHandle;
@@ -126,16 +135,80 @@ function backupToFile() {
       updateSyncIndicator();
       return;
     }
-    // Write full data to _data.json (at root of selected directory)
+    // 1. Write full backup _data.json (for quick sync)
     return _getFileHandle(dirHandle, ['_data.json']).then(function (fileHandle) {
       return fileHandle.createWritable().then(function (writable) {
         return writable.write(JSON.stringify(appData, null, 2)).then(function () {
           return writable.close();
         });
       });
+    }).then(function () {
+      // 2. Write individual files in tree structure
+      return _backupTreeStructure(dirHandle);
     });
   }).catch(function (e) {
     console.warn('Backup failed:', e);
+  });
+}
+
+// Write individual quiz files in tree structure: data/subjects/{学科}/{path}/{题库名}.json
+function _backupTreeStructure(dirHandle) {
+  var subjects = appData.subjects || [];
+  var promises = [];
+  subjects.forEach(function (subj) {
+    var root = subj.nodes ? subj.nodes.find(function (n) { return n.type === 'folder' && !n.parentId; }) : null;
+    if (!root) return;
+    // Get all file nodes and build their paths
+    var fileNodes = (subj.nodes || []).filter(function (n) { return n.type === 'file'; });
+    fileNodes.forEach(function (fileNode) {
+      var pathParts = _buildFilePath(subj, fileNode);
+      if (!pathParts.length) return;
+      var files = fileNode.questions || [];
+      var p = _getFileHandle(dirHandle, pathParts).then(function (fh) {
+        return fh.createWritable().then(function (w) {
+          return w.write(JSON.stringify(files, null, 2)).then(function () { return w.close(); });
+        });
+      });
+      promises.push(p);
+    });
+  });
+  return Promise.all(promises);
+}
+
+// Build relative path for a file node: [subjectName, ...folders, fileName.json]
+function _buildFilePath(subject, fileNode) {
+  var parts = [subject.name];
+  // Build folder path from root to file's parent
+  var parentId = fileNode.parentId;
+  var folderPath = [];
+  while (parentId) {
+    var parent = (subject.nodes || []).find(function (n) { return n.id === parentId; });
+    if (!parent) break;
+    folderPath.unshift(parent.name);
+    parentId = parent.parentId || null;
+  }
+  // Skip the root folder name (same as subject name)
+  folderPath = folderPath.filter(function (name) { return name !== subject.name; });
+  parts = parts.concat(folderPath);
+  parts.push(fileNode.name + '.json');
+  return parts;
+}
+
+// One-click sync: load from local _data.json and merge
+function syncFromLocal() {
+  if (!localDirHandle) return toast('请先绑定本地文件夹', 'warning');
+  var btn = document.getElementById('btn-sync-now');
+  if (btn) { btn.textContent = '⏳ 同步中...'; btn.disabled = true; }
+  loadFromFile().then(function (fileData) {
+    if (!fileData || !fileData.subjects) {
+      toast('未找到本地数据文件', 'warning');
+      return;
+    }
+    mergeLocalData(fileData);
+  }).catch(function (e) {
+    toast('同步失败：' + (e.message || '未知错误'), 'error');
+  }).finally(function () {
+    if (btn) { btn.textContent = '🔄 一键同步'; btn.disabled = false; }
   });
 }
 
@@ -205,16 +278,38 @@ function mergeLocalData(fileData) {
   toast('已从本地文件同步数据', 'success');
 }
 
-// Update the sync indicator in sidebar
+// Update the sync indicator in sidebar (compact)
 function updateSyncIndicator() {
   var el = document.getElementById('sync-status');
   if (!el) return;
   if (localSyncEnabled) {
-    el.innerHTML = '<span style="color:var(--success)" title="本地同步已启用">🟢 本地同步</span>';
+    el.innerHTML = '<span style="color:var(--success);font-size:11px">🟢 已同步到本地</span>';
   } else if (window.showDirectoryPicker) {
-    el.innerHTML = '<a href="#" onclick="pickDataDirectory();return false" style="color:var(--gray-400);font-size:11px;text-decoration:none" title="点击绑定本地文件夹">📁 绑定本地文件夹</a>';
+    el.innerHTML = '<span style="color:var(--gray-400);font-size:11px">📁 未绑定目录</span>';
   } else {
-    el.innerHTML = '<span style="color:var(--gray-400);font-size:11px">💻 浏览器存储</span>';
+    el.innerHTML = '';
+  }
+}
+
+// Update the directory display in settings modal
+function updateDirDisplay() {
+  var pathText = document.getElementById('dir-path-text');
+  var bindBtn = document.getElementById('btn-bind-dir');
+  var unbindBtn = document.getElementById('btn-unbind-dir');
+  var syncBtn = document.getElementById('btn-sync-now');
+  if (!pathText) return;
+  if (localSyncEnabled && localDirName) {
+    pathText.textContent = '…\\' + localDirName;
+    pathText.style.color = 'var(--gray-700)';
+    if (bindBtn) bindBtn.textContent = '更改目录';
+    if (unbindBtn) unbindBtn.style.display = '';
+    if (syncBtn) syncBtn.style.display = '';
+  } else {
+    pathText.textContent = '未绑定';
+    pathText.style.color = 'var(--gray-400)';
+    if (bindBtn) bindBtn.textContent = '选择目录';
+    if (unbindBtn) unbindBtn.style.display = 'none';
+    if (syncBtn) syncBtn.style.display = 'none';
   }
 }
 

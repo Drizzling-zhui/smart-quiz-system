@@ -116,21 +116,32 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto
 .q-card .q-options { font-size: 12px; color: var(--gray-600); margin-bottom: 4px; }
 .q-card .q-options .opt { padding: 1px 0; }
 
-/* Stats badges */
-.q-card .q-stats { display: flex; gap: 8px; margin-top: 4px; }
-.q-card .q-stats .stat-badge { font-size: 11px; color: var(--gray-400); display: flex; align-items: center; gap: 3px; }
-.q-card .q-stats .stat-badge.attempt { color: var(--primary); }
-.q-card .q-stats .stat-badge.wrong { color: var(--danger); }
-.q-card .q-stats .stat-badge.acc { }
-.q-card .q-stats .stat-badge.acc.high { color: var(--success); }
-.q-card .q-stats .stat-badge.acc.medium { color: var(--warning); }
-.q-card .q-stats .stat-badge.acc.low { color: var(--danger); }
-.q-card .q-footer { display: flex; gap: 4px; margin-top: 6px; justify-content: flex-end; border-top: 1px solid var(--gray-100); padding-top: 6px; }
+/* Stats display */
+.q-card .q-stats { display: flex; gap: 10px; margin-top: 6px; align-items: center; flex-wrap: wrap; }
+.q-card .q-stats .stat-acc-pill {
+  font-size: 13px;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+.q-card .q-stats .stat-detail {
+  font-size: 12px;
+  color: var(--gray-500);
+  white-space: nowrap;
+}
+.q-card .q-footer { display: flex; gap: 4px; margin-top: 6px; justify-content: flex-end; border-top: 1px solid var(--gray-100); padding-top: 6px; flex-wrap: wrap; }
 .q-card .q-footer button { border: none; background: none; cursor: pointer; font-size: 11px; padding: 2px 8px; border-radius: 4px; color: var(--gray-500); }
 .q-card .q-footer button:hover { background: var(--gray-100); }
 .q-card .q-footer button.edit:hover { color: var(--primary); }
 .q-card .q-footer button.del:hover { color: var(--danger); }
 .q-card .q-footer button.ask-ai:hover { color: #7c3aed; }
+.q-card .q-footer button.btn-notes { color: var(--gray-400); }
+.q-card .q-footer button.btn-notes:hover { color: #d97706; background: #fffbeb; }
+.q-card .q-footer button.btn-notes.has-notes { color: #d97706; font-weight: 600; }
 
 /* ===== Quiz Mode ===== */
 .quiz-setup { text-align: center; padding: 40px 20px; }
@@ -262,6 +273,36 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto
 .mstab-content { display: none; }
 .mstab-content.active { display: block; padding-top: 10px; }
 
+/* File import drop zone */
+.file-drop-zone {
+  border: 2px dashed var(--gray-300);
+  border-radius: 10px;
+  padding: 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: all .2s;
+  background: var(--gray-50);
+}
+.file-drop-zone:hover, .file-drop-zone.dragover {
+  border-color: var(--primary);
+  background: #f0f2ff;
+}
+.file-drop-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+#file-text-preview {
+  background: var(--gray-50);
+  border: 1px solid var(--gray-200);
+  border-radius: 6px;
+  padding: 8px;
+  font-family: monospace;
+}
+.pv-item .ai-badge { font-size: 10px; background: #dbeafe; color: #1e40af; padding: 1px 5px; border-radius: 3px; margin-left: 4px; }
+.pv-item .no-ans-badge { font-size: 10px; background: #fef3c7; color: #92400e; padding: 1px 5px; border-radius: 3px; margin-left: 4px; }
+
 /* Toast */
 .toast-container { position: fixed; top: 16px; right: 16px; z-index: 2000; display: flex; flex-direction: column; gap: 6px; }
 .toast { padding: 10px 18px; border-radius: 8px; color: #fff; font-size: 13px; box-shadow: var(--shadow-lg); animation: slideIn .3s ease; max-width: 340px; }
@@ -382,6 +423,59 @@ body.resizing .chat-resize-handle { background: rgba(79,110,247,.25); }
 .api-status { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; padding: 2px 8px; border-radius: 10px; }
 .api-status.ok { background: #f0fdf4; color: var(--success); }
 .api-status.no { background: #fef2f2; color: var(--danger); }
+
+/* Directory picker in settings */
+.dir-picker { display: flex; gap: 8px; align-items: center; }
+.dir-path { flex: 1; display: flex; align-items: center; gap: 8px; padding: 7px 10px; background: var(--gray-50); border: 1px solid var(--gray-200); border-radius: 6px; font-size: 12px; min-height: 34px; }
+.dir-path .dir-icon { flex-shrink: 0; font-size: 14px; }
+.dir-path .dir-text { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--gray-400); }
+.dir-actions { display: flex; gap: 4px; flex-shrink: 0; }
+.dir-actions button { padding: 7px 12px; border: 1px solid var(--gray-300); background: #fff; border-radius: 6px; cursor: pointer; font-size: 12px; color: var(--gray-600); white-space: nowrap; transition: all .15s; }
+.dir-actions button:hover { border-color: var(--primary); color: var(--primary); background: var(--primary-light); }
+#btn-unbind-dir:hover { border-color: var(--danger); color: var(--danger); background: #fef2f2; }
+#btn-sync-now { color: var(--success) !important; border-color: var(--success) !important; }
+#btn-sync-now:hover { background: #f0fdf4 !important; }
+
+/* Settings sections */
+.settings-section {
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--gray-100);
+}
+.settings-section:last-of-type { border-bottom: none; margin-bottom: 0; }
+.settings-section-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--gray-800);
+  margin-bottom: 4px;
+}
+
+/* Tutorial steps */
+.tutorial-step {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.tutorial-step-num {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.tutorial-step-body { flex: 1; }
+.tutorial-step-body strong { font-size: 13px; color: var(--gray-800); }
+.tutorial-step-body p { font-size: 12px; color: var(--gray-600); margin: 4px 0; line-height: 1.6; }
+.tutorial-step-body ul { margin: 4px 0; padding-left: 16px; }
+.tutorial-step-body ul li { font-size: 11px; color: var(--gray-600); line-height: 1.7; }
+.tutorial-step-body ul li strong { font-size: 11px; }
 
 /* Import picker tree */
 .ip-subject-header:hover { background: var(--gray-100); }

@@ -1,0 +1,27 @@
+{
+  "name": "quiz-app",
+  "version": "1.0.0",
+  "description": "纯前端单页应用，用于管理和练习题库。支持学科管理、题库浏览、答题训练、多种格式导入导出，以及本地文件夹双向同步。",
+  "main": "index.js",
+  "scripts": {
+    "copy": "node -e \"var fs=require('fs'),p=require('path');var dirs=['css','js'];dirs.forEach(function(d){var src=p.join(__dirname,d),dst=p.join(__dirname,'www',d);if(!fs.existsSync(dst))fs.mkdirSync(dst,{recursive:true});fs.readdirSync(src).forEach(function(f){fs.copyFileSync(p.join(src,f),p.join(dst,f))})});['index.html'].forEach(function(f){fs.copyFileSync(p.join(__dirname,f),p.join(__dirname,'www',f))});console.log('Copied to www/')\"",
+    "sync": "npm run copy && npx cap sync"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Drizzling-zhui/smart-quiz-system.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Drizzling-zhui/smart-quiz-system/issues"
+  },
+  "homepage": "https://github.com/Drizzling-zhui/smart-quiz-system#readme",
+  "dependencies": {
+    "@capacitor/android": "^8.3.4",
+    "@capacitor/cli": "^8.3.4",
+    "@capacitor/core": "^8.3.4"
+  }
+}

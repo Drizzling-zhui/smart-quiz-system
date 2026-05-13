@@ -8,3 +8,9 @@ CLAUDE.md
 data/subjects/*.json
 data/subjects/**/*.json
 data/_data.json
+*.enc
+node_modules/
+android/
+www/
+.capacitor/
+package-lock.json

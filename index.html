@@ -426,6 +426,27 @@
       <button class="btn-cancel" onclick="hideModal('settings')">关闭</button>
       <button class="btn-confirm" onclick="saveApiSettings()">保存</button>
     </div>
+
+    <!-- Section: Data Sync -->
+    <div class="settings-section">
+      <div class="settings-section-title">🔐 数据同步</div>
+      <p style="font-size:12px;color:var(--gray-500);margin-bottom:10px">设置同步口令，将题库加密导出后在手机APK中解密导入。加密文件(.enc)可安全传输。</p>
+      <div class="field">
+        <label>同步口令</label>
+        <input type="password" id="sync-password" placeholder="设置一个只有你知道的口令（至少4位）" autocomplete="off">
+      </div>
+      <div style="margin-top:8px;display:flex;gap:8px">
+        <button onclick="exportEncrypted()" style="padding:7px 16px;background:var(--success);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px">📤 加密导出题库</button>
+        <button onclick="document.getElementById('sync-import-file').click()" style="padding:7px 16px;background:#fff;color:var(--gray-600);border:1px solid var(--gray-300);border-radius:6px;cursor:pointer;font-size:13px">📥 解密导入题库</button>
+        <input type="file" id="sync-import-file" accept=".enc" onchange="importEncrypted(this.files[0])" style="display:none">
+      </div>
+      <p id="sync-status" style="font-size:11px;color:var(--gray-400);margin-top:8px;min-height:16px"></p>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="hideModal('settings')">关闭</button>
+      <button class="btn-confirm" onclick="saveApiSettings()">保存</button>
+    </div>
   </div>
 </div>
 
@@ -441,6 +462,7 @@
 <script src="js/quiz.js"></script>
 <script src="js/chat.js"></script>
 <script src="js/storage.js"></script>
+<script src="js/sync.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

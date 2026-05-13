@@ -139,16 +139,9 @@ function importParsedQuestions() {
   showImportPicker(doImport);
 }
 
-function aiParseText() {
-  var text = document.getElementById('import-text').value.trim();
-  if (!text) return toast('请粘贴题目文本', 'warning');
-  if (!hasApiConfigured()) {
-    return toast('请先在设置中配置 API', 'warning');
-  }
-  var btn = document.getElementById('btn-ai-parse');
-  btn.textContent = '⏳ AI解析中...'; btn.disabled = true;
-  var cfg = getApiConfig();
-
+// Shared: call AI API and return parsed questions array
+// text: user text, cfg: API config, fileMode: if true, mark unanswered as aiGenerated
+function _callAIParse(text, cfg, fileMode) {
   var systemPrompt = '你是一个专业的题目解析助手，从用户提供的文本中提取所有题目，返回JSON数组。\n\n' +
     '核心规则（严格遵守）：\n' +
     '1. 题干(question) = 纯题目文字，不要把答案、选项、解析混入题干\n' +
@@ -156,7 +149,8 @@ function aiParseText() {
     '3. 选项(options) = 仅选择题需要，每个选项{label, text}，文本完整提取\n' +
     '4. 如果原文同时出现"我的答案"和"正确答案"，以"正确答案"为准\n' +
     '5. 类型(type)：choice=单选, multi=多选, judge=判断, fill=填空, short=简答\n' +
-    '6. 解析(explanation) = 提取原文中的答案解析，没有则为空字符串""\n\n' +
+    '6. 解析(explanation) = 提取原文中的答案解析，没有则为空字符串""\n' +
+    (fileMode ? '7. aiGenerated = 没有答案的题目设为true，有答案的设为false\n\n' : '\n') +
     '输出格式：只返回一个```json代码块，不要任何其他说明文字。';
 
   var body = {
@@ -165,103 +159,187 @@ function aiParseText() {
       { role: 'system', content: systemPrompt },
       { role: 'user', content: '请解析以下文本中的题目：\n\n' + text }
     ],
-    max_tokens: 4096,
+    max_tokens: 16384,
     temperature: 0.1
   };
   if (typeof chatFastMode !== 'undefined' && chatFastMode) {
     body.thinking = { type: 'disabled' };
   }
 
-  fetch(cfg.endpoint, {
+  return fetch(cfg.endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + cfg.key },
     body: JSON.stringify(body)
   }).then(function (r) {
-    if (!r.ok) throw new Error('API请求失败(HTTP ' + r.status + ')');
+    if (!r.ok) {
+      if (r.status === 413) throw new Error('文本过长，请分段后重试');
+      if (r.status === 429) throw new Error('请求太频繁，请稍后重试');
+      throw new Error('API请求失败(HTTP ' + r.status + ')');
+    }
     return r.json();
   }).then(function (data) {
-    var content = '';
-    if (data.choices && data.choices[0]) content = data.choices[0].message.content;
-    else throw new Error('无法解析API响应');
+    if (!data.choices || !data.choices[0]) throw new Error('无法解析API响应');
+    var content = data.choices[0].message.content || '';
 
-    // 1. Try ```json code block first (standard AI output format)
     var jsonStr = '';
     var codeMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
     if (codeMatch) {
       jsonStr = codeMatch[1].trim();
     } else {
-      // 2. Try bare JSON array
       var arrMatch = content.match(/\[[\s\S]*\]/);
       if (arrMatch) jsonStr = arrMatch[0];
     }
     if (!jsonStr) throw new Error('AI返回格式异常，未找到JSON数据');
 
-    // 3. Use fixJSON for robust parsing (8-layer auto-fix)
     var fixResult = fixJSON(jsonStr);
     if (!fixResult.success || !fixResult.output) {
       throw new Error('JSON解析失败：' + (fixResult.error || '未知错误'));
     }
 
-    // 4. Handle both array and {questions:[...]} wrapper
     var questions = Array.isArray(fixResult.output) ? fixResult.output : (fixResult.output.questions || []);
     if (!questions.length) throw new Error('未解析出题目');
 
-    // 5. Normalize each question
     questions.forEach(function (q) {
       if (!q.type) q.type = 'choice';
       if (!q.explanation) q.explanation = '';
       if (!q.options) q.options = [];
-      if (!q.answer) q.answer = '';
       if (!q.stats) q.stats = { attempts: 0, correct: 0, wrong: 0 };
-      // Strip "正确答案：X" from answer field if AI mistakenly included it
+      if (!q.answer) q.answer = '';
+      if (fileMode) q.aiGenerated = !q.answer;
       var correctMatch = (q.answer || '').match(/正确答案[：:]\s*(.+)/);
       if (correctMatch) q.answer = correctMatch[1].trim();
-      // Normalize choice answer: ensure single uppercase letter
-      if ((q.type === 'choice' || q.type === 'judge') && q.options && q.options.length) {
-        var letterMatch = (q.answer || '').match(/[A-Da-d]/);
+      if ((q.type === 'choice' || q.type === 'judge') && q.options && q.options.length && q.answer) {
+        var letterMatch = q.answer.match(/[A-Da-d]/);
         if (letterMatch) q.answer = letterMatch[0].toUpperCase();
       }
-      // Normalize multi answer: remove non-letter chars, uppercase
       if (q.type === 'multi' && q.options && q.options.length && q.answer) {
         q.answer = q.answer.replace(/[^A-Za-z]/g, '').toUpperCase();
       }
-      // Normalize type from answer content
-      if (!q.type || q.type === 'choice') {
-        if (q.answer === '正确' || q.answer === '错误') q.type = 'judge';
+      if ((!q.type || q.type === 'choice') && (q.answer === '正确' || q.answer === '错误')) {
+        q.type = 'judge';
       }
     });
-
-    var preview = document.getElementById('import-preview-text');
-    var fixNote = (fixResult.fixes && fixResult.fixes.length && fixResult.fixes[0] !== '完美解析')
-      ? ' <span style="font-size:11px;color:var(--warning)">（JSON自动修复：' + fixResult.fixes.join(' → ') + '）</span>' : '';
-    var previewHtml = '<div style="margin:10px 0;padding:8px 14px;background:#f0fdf4;border-radius:6px;color:#166534;font-size:13px">';
-    previewHtml += '✅ AI解析出 ' + questions.length + ' 道题' + fixNote;
-    previewHtml += '<button class="btn-primary btn-sm" style="margin-left:8px" onclick="importParsedQuestions()">确认导入</button>';
-    previewHtml += '<button class="btn-outline btn-sm" style="margin-left:4px" onclick="document.getElementById(\'import-preview-text\').innerHTML=\'\'">取消</button>';
-    previewHtml += '</div><div class="preview-list">';
-    questions.forEach(function (q, i) {
-      var typeMap2 = { choice: '单选', multi: '多选', judge: '判断', fill: '填空', short: '简答' };
-      var typeLabel = typeMap2[q.type] || q.type;
-      var qText = (q.question || '').slice(0, 50);
-      if ((q.question || '').length > 50) qText += '...';
-      previewHtml += '<div class="pv-item"><span class="status">✅</span> #' + (i + 1) + ' [' + typeLabel + '] ' + escHtml(qText) + '</div>';
-    });
-    previewHtml += '</div>';
-    preview.innerHTML = previewHtml;
-    window._parsedQ = questions;
-    toast('AI解析完成！', 'success');
-  }).catch(function (e) {
-    var preview = document.getElementById('import-preview-text');
-    preview.innerHTML =
-      '<div style="margin:10px 0;padding:8px 14px;background:#fef2f2;border-radius:6px;color:#991b1b;font-size:13px">' +
-        '❌ AI解析失败：' + escHtml(e.message) +
-        '<button class="btn-outline btn-sm" style="margin-left:8px" onclick="parseTextImport()">改用正则解析</button>' +
-        '<button class="btn-outline btn-sm" style="margin-left:4px" onclick="document.getElementById(\'import-preview-text\').innerHTML=\'\'">关闭</button>' +
-      '</div>';
-    toast('AI解析失败：' + e.message, 'error');
-  }).finally(function () {
-    btn.textContent = '🤖 AI 智能解析'; btn.disabled = false;
+    return questions;
   });
+}
+
+// Split long text into chunks at logical boundaries (double newlines)
+var AI_MAX_CHARS_PER_CHUNK = 10000;
+function _chunkText(text) {
+  if (text.length <= AI_MAX_CHARS_PER_CHUNK) return [text];
+  var chunks = [];
+  var paragraphs = text.split(/\n\n+/);
+  var current = '';
+  paragraphs.forEach(function (p) {
+    p = p.trim();
+    if (!p) return;
+    if (current && current.length + p.length + 2 > AI_MAX_CHARS_PER_CHUNK) {
+      chunks.push(current);
+      current = p;
+    } else {
+      current = current ? current + '\n\n' + p : p;
+    }
+  });
+  if (current) chunks.push(current);
+  return chunks.length ? chunks : [text];
+}
+
+function aiParseText() {
+  var text = document.getElementById('import-text').value.trim();
+  if (!text) return toast('请粘贴题目文本', 'warning');
+  if (!hasApiConfigured()) return toast('请先在设置中配置 API', 'warning');
+  var btn = document.getElementById('btn-ai-parse');
+  btn.textContent = '⏳ AI解析中...'; btn.disabled = true;
+  var cfg = getApiConfig();
+
+  var chunks = _chunkText(text);
+  var allQuestions = [];
+  var errors = [];
+
+  function processNext(i) {
+    if (i >= chunks.length) {
+      btn.textContent = '🤖 AI 智能解析'; btn.disabled = false;
+      if (errors.length && !allQuestions.length) {
+        var preview = document.getElementById('import-preview-text');
+        preview.innerHTML = '<div style="margin:10px 0;padding:8px 14px;background:#fef2f2;border-radius:6px;color:#991b1b;font-size:13px">' +
+          '❌ AI解析失败：' + escHtml(errors[0]) +
+          '<button class="btn-outline btn-sm" style="margin-left:8px" onclick="parseTextImport()">改用正则解析</button>' +
+          '<button class="btn-outline btn-sm" style="margin-left:4px" onclick="document.getElementById(\'import-preview-text\').innerHTML=\'\'">关闭</button></div>';
+        return toast('AI解析失败：' + errors[0], 'error');
+      }
+      // Deduplicate (questions might appear in multiple chunks)
+      var seen = {};
+      allQuestions = allQuestions.filter(function (q) {
+        var key = (q.question || '').slice(0, 40);
+        if (seen[key]) return false;
+        seen[key] = true;
+        return true;
+      });
+      window._parsedQ = allQuestions;
+      _renderParsePreview('text', allQuestions, null);
+      var msg = 'AI解析出 ' + allQuestions.length + ' 道题';
+      if (errors.length) msg += '（' + errors.length + '段失败）';
+      toast(msg, 'success');
+      return;
+    }
+    btn.textContent = '⏳ 解析中 ' + (i + 1) + '/' + chunks.length + '...';
+    _callAIParse(chunks[i], cfg, false).then(function (questions) {
+      allQuestions = allQuestions.concat(questions);
+      processNext(i + 1);
+    }).catch(function (e) {
+      errors.push(e.message);
+      processNext(i + 1);
+    });
+  }
+  processNext(0);
+}
+
+function _renderParsePreview(mode, questions, fixResult) {
+  var previewEl, confirmFn;
+  if (mode === 'file') {
+    previewEl = document.getElementById('import-preview-file');
+    confirmFn = 'importFileParsedQuestions()';
+  } else {
+    previewEl = document.getElementById('import-preview-text');
+    confirmFn = 'importParsedQuestions()';
+  }
+  if (!previewEl) return;
+
+  var withoutAnswer = questions.filter(function (q) { return !q.answer; }).length;
+  var fixNote = (fixResult && fixResult.fixes && fixResult.fixes.length && fixResult.fixes[0] !== '完美解析')
+    ? ' <span style="font-size:11px;color:var(--warning)">（JSON自动修复：' + fixResult.fixes.join(' → ') + '）</span>' : '';
+  var html = '<div style="margin:10px 0;padding:8px 14px;background:#f0fdf4;border-radius:6px;color:#166534;font-size:13px">';
+  html += '✅ AI解析出 ' + questions.length + ' 道题' + fixNote;
+  if (mode === 'file' && withoutAnswer > 0) {
+    html += ' <span style="color:#d97706">（' + withoutAnswer + ' 道未找到答案）</span>';
+  }
+  html += '<button class="btn-primary btn-sm" style="margin-left:8px" onclick="' + confirmFn + '">确认导入</button>';
+  html += '<button class="btn-outline btn-sm" style="margin-left:4px" onclick="document.getElementById(\'' + previewEl.id + '\').innerHTML=\'\'">取消</button>';
+  html += '</div><div class="preview-list">';
+  questions.forEach(function (q, i) {
+    var typeMap = { choice: '单选', multi: '多选', judge: '判断', fill: '填空', short: '简答' };
+    var typeLabel = typeMap[q.type] || q.type;
+    var qText = (q.question || '').slice(0, 50);
+    if ((q.question || '').length > 50) qText += '...';
+    var badges = '';
+    if (mode === 'file') {
+      if (q.aiGenerated) badges += ' <span style="font-size:10px;background:#dbeafe;color:#1e40af;padding:1px 5px;border-radius:3px">AI答案</span>';
+      if (!q.answer) badges += ' <span style="font-size:10px;background:#fef3c7;color:#92400e;padding:1px 5px;border-radius:3px">无答案</span>';
+    }
+    html += '<div class="pv-item"><span class="status">✅</span> #' + (i + 1) + ' [' + typeLabel + '] ' + escHtml(qText) + badges + '</div>';
+  });
+  html += '</div>';
+  previewEl.innerHTML = html;
+
+  if (mode === 'file') {
+    if (withoutAnswer > 0) {
+      var banner = document.getElementById('file-no-answer-banner');
+      if (banner) { banner.style.display = 'block'; banner.querySelector('span').textContent = '⚠️ ' + withoutAnswer + ' 道题目没有答案，可以尝试'; }
+    } else {
+      var b = document.getElementById('file-no-answer-banner');
+      if (b) b.style.display = 'none';
+    }
+  }
 }
 
 // ============================================================
@@ -415,131 +493,49 @@ function aiParseFileText() {
 
 function _aiParseToFilePreview(text) {
   if (!hasApiConfigured()) return toast('请先在设置中配置 API', 'warning');
-  var preview = document.getElementById('import-preview-file');
   var btn = document.getElementById('btn-ai-parse-file');
   btn.textContent = '⏳ AI解析中...'; btn.disabled = true;
   var cfg = getApiConfig();
+  var preview = document.getElementById('import-preview-file');
 
-  var systemPrompt = '你是一个专业的题目解析助手，从用户提供的文本中提取所有题目，返回JSON数组。\n\n' +
-    '核心规则（严格遵守）：\n' +
-    '1. 题干(question) = 纯题目文字，不要把答案、选项、解析混入题干\n' +
-    '2. 答案(answer) = 从文本中准确提取正确答案。选择题只保留字母(A/B/C/D)，多选题字母连写如"ABD"。判断题只写"正确"或"错误"。填空/简答写关键词语。如果原文没有提供答案，answer 留空字符串""\n' +
-    '3. 选项(options) = 仅选择题需要，每个选项{label, text}，文本完整提取\n' +
-    '4. 如果原文同时出现"我的答案"和"正确答案"，以"正确答案"为准\n' +
-    '5. 类型(type)：choice=单选, multi=多选, judge=判断, fill=填空, short=简答\n' +
-    '6. 解析(explanation) = 提取原文中的答案解析，没有则为空字符串""\n' +
-    '7. aiGenerated = 没有答案的题目设为true，有答案的设为false\n\n' +
-    '输出格式：只返回一个```json代码块，不要任何其他说明文字。';
+  var chunks = _chunkText(text);
+  var allQuestions = [];
+  var errors = [];
 
-  var body = {
-    model: cfg.model,
-    messages: [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: '请解析以下文本中的题目：\n\n' + text }
-    ],
-    max_tokens: 4096,
-    temperature: 0.1
-  };
-  if (typeof chatFastMode !== 'undefined' && chatFastMode) {
-    body.thinking = { type: 'disabled' };
+  function processNext(i) {
+    if (i >= chunks.length) {
+      btn.textContent = '🤖 AI 智能解析'; btn.disabled = false;
+      if (errors.length && !allQuestions.length) {
+        preview.innerHTML = '<div style="margin:10px 0;padding:8px 14px;background:#fef2f2;border-radius:6px;color:#991b1b;font-size:13px">' +
+          '❌ AI解析失败：' + escHtml(errors[0]) +
+          '<button class="btn-outline btn-sm" style="margin-left:8px" onclick="parseFileTextRegex()">改用正则解析</button>' +
+          '<button class="btn-outline btn-sm" style="margin-left:4px" onclick="document.getElementById(\'import-preview-file\').innerHTML=\'\'">关闭</button></div>';
+        return toast('AI解析失败：' + errors[0], 'error');
+      }
+      var seen = {};
+      allQuestions = allQuestions.filter(function (q) {
+        var key = (q.question || '').slice(0, 40);
+        if (seen[key]) return false;
+        seen[key] = true;
+        return true;
+      });
+      window._fileParsedQ = allQuestions;
+      _renderParsePreview('file', allQuestions, null);
+      var msg = 'AI解析出 ' + allQuestions.length + ' 道题';
+      if (errors.length) msg += '（' + errors.length + '段失败）';
+      toast(msg, 'success');
+      return;
+    }
+    btn.textContent = '⏳ 解析中 ' + (i + 1) + '/' + chunks.length + '...';
+    _callAIParse(chunks[i], cfg, true).then(function (questions) {
+      allQuestions = allQuestions.concat(questions);
+      processNext(i + 1);
+    }).catch(function (e) {
+      errors.push(e.message);
+      processNext(i + 1);
+    });
   }
-
-  fetch(cfg.endpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + cfg.key },
-    body: JSON.stringify(body)
-  }).then(function (r) {
-    if (!r.ok) throw new Error('API请求失败(HTTP ' + r.status + ')');
-    return r.json();
-  }).then(function (data) {
-    var content = '';
-    if (data.choices && data.choices[0]) content = data.choices[0].message.content;
-
-    var jsonStr = '';
-    var codeMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (codeMatch) {
-      jsonStr = codeMatch[1].trim();
-    } else {
-      var arrMatch = content.match(/\[[\s\S]*\]/);
-      if (arrMatch) jsonStr = arrMatch[0];
-    }
-    if (!jsonStr) throw new Error('AI返回格式异常，未找到JSON数据');
-
-    var fixResult = fixJSON(jsonStr);
-    if (!fixResult.success || !fixResult.output) {
-      throw new Error('JSON解析失败：' + (fixResult.error || '未知错误'));
-    }
-
-    var questions = Array.isArray(fixResult.output) ? fixResult.output : (fixResult.output.questions || []);
-    if (!questions.length) throw new Error('未解析出题目');
-
-    // Normalize and count unanswered
-    var withoutAnswer = 0;
-    questions.forEach(function (q) {
-      if (!q.type) q.type = 'choice';
-      if (!q.explanation) q.explanation = '';
-      if (!q.options) q.options = [];
-      if (!q.stats) q.stats = { attempts: 0, correct: 0, wrong: 0 };
-      if (!q.answer) q.answer = '';
-      // Mark AI-generated flag
-      q.aiGenerated = !q.answer;
-      if (!q.answer) withoutAnswer++;
-      // Normalize answer
-      var correctMatch = (q.answer || '').match(/正确答案[：:]\s*(.+)/);
-      if (correctMatch) q.answer = correctMatch[1].trim();
-      if ((q.type === 'choice' || q.type === 'judge') && q.options && q.options.length && q.answer) {
-        var letterMatch = q.answer.match(/[A-Da-d]/);
-        if (letterMatch) q.answer = letterMatch[0].toUpperCase();
-      }
-      if (q.type === 'multi' && q.options && q.options.length && q.answer) {
-        q.answer = q.answer.replace(/[^A-Za-z]/g, '').toUpperCase();
-      }
-      if ((!q.type || q.type === 'choice') && (q.answer === '正确' || q.answer === '错误')) {
-        q.type = 'judge';
-      }
-    });
-
-    var fixNote = (fixResult.fixes && fixResult.fixes.length && fixResult.fixes[0] !== '完美解析')
-      ? ' <span style="font-size:11px;color:var(--warning)">（JSON自动修复：' + fixResult.fixes.join(' → ') + '）</span>' : '';
-    var previewHtml = '<div style="margin:10px 0;padding:8px 14px;background:#f0fdf4;border-radius:6px;color:#166534;font-size:13px">';
-    previewHtml += '✅ AI解析出 ' + questions.length + ' 道题' + fixNote;
-    if (withoutAnswer > 0) {
-      previewHtml += ' <span style="color:#d97706">（' + withoutAnswer + ' 道未找到答案）</span>';
-    }
-    previewHtml += '<button class="btn-primary btn-sm" style="margin-left:8px" onclick="importFileParsedQuestions()">确认导入</button>';
-    previewHtml += '<button class="btn-outline btn-sm" style="margin-left:4px" onclick="document.getElementById(\'import-preview-file\').innerHTML=\'\'">取消</button>';
-    previewHtml += '</div><div class="preview-list">';
-    questions.forEach(function (q, i) {
-      var typeMap2 = { choice: '单选', multi: '多选', judge: '判断', fill: '填空', short: '简答' };
-      var typeLabel = typeMap2[q.type] || q.type;
-      var qText = (q.question || '').slice(0, 50);
-      if ((q.question || '').length > 50) qText += '...';
-      var noAnsBadge = !q.answer ? ' <span style="font-size:10px;background:#fef3c7;color:#92400e;padding:1px 5px;border-radius:3px">无答案</span>' : '';
-      previewHtml += '<div class="pv-item"><span class="status">✅</span> #' + (i + 1) + ' [' + typeLabel + '] ' + escHtml(qText) + noAnsBadge + '</div>';
-    });
-    previewHtml += '</div>';
-    preview.innerHTML = previewHtml;
-    window._fileParsedQ = questions;
-
-    // Show banner if questions lack answers
-    if (withoutAnswer > 0) {
-      var banner = document.getElementById('file-no-answer-banner');
-      banner.style.display = 'block';
-      banner.querySelector('span').textContent = '⚠️ ' + withoutAnswer + ' 道题目没有答案，可以尝试';
-    }
-
-    toast('AI解析完成！', 'success');
-  }).catch(function (e) {
-    preview.innerHTML =
-      '<div style="margin:10px 0;padding:8px 14px;background:#fef2f2;border-radius:6px;color:#991b1b;font-size:13px">' +
-        '❌ AI解析失败：' + escHtml(e.message) +
-        '<button class="btn-outline btn-sm" style="margin-left:8px" onclick="parseFileTextRegex()">改用正则解析</button>' +
-        '<button class="btn-outline btn-sm" style="margin-left:4px" onclick="document.getElementById(\'import-preview-file\').innerHTML=\'\'">关闭</button>' +
-      '</div>';
-    toast('AI解析失败：' + e.message, 'error');
-  }).finally(function () {
-    btn.textContent = '🤖 AI 智能解析'; btn.disabled = false;
-  });
+  processNext(0);
 }
 
 function parseFileTextRegex() {

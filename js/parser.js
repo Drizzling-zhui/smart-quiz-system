@@ -762,9 +762,4 @@ function _initFileDropZone() {
   });
 }
 
-// Auto-init when file sub-tab is shown
-var _origSwitchModalSubTab = switchModalSubTab;
-switchModalSubTab = function (tab, btn) {
-  _origSwitchModalSubTab(tab, btn);
-  if (tab === 'file') setTimeout(_initFileDropZone, 50);
-};
+// File drop zone initialized via switchModalTab in modal.js when tab === 'file'

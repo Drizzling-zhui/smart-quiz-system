@@ -10,6 +10,7 @@ var currentSubject = null;
 var currentNodeId = null;
 var currentFilter = 'all';
 var currentBrowseMode = 'sequential';
+var showAnswers = false;
 var favorites = [];
 
 function loadFavorites() {

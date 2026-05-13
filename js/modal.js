@@ -58,6 +58,7 @@ function switchModalTab(tab, btn) {
   document.querySelectorAll('.mtab-content').forEach(function (c) { c.classList.remove('active'); });
   if (btn) btn.classList.add('active');
   document.getElementById('mtab-' + tab).classList.add('active');
+  if (tab === 'file') setTimeout(_initFileDropZone, 50);
 }
 
 function switchModalSubTab(tab, btn) {

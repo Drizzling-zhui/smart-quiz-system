@@ -181,69 +181,6 @@ function renderImportPickerChildren(parentId, subject) {
 // ============================================================
 // IMPORT / EXPORT
 // ============================================================
-function fixAndPreviewJSON() {
-  var input = document.getElementById('import-json').value.trim();
-  if (!input) return toast('请粘贴JSON数据', 'warning');
-  var result = fixJSON(input);
-  var preview = document.getElementById('import-preview-json');
-  if (result.success) {
-    var data = result.output;
-    var qc = data.subjects ? data.subjects.reduce(function (s, sub) { return s + (sub.questions ? sub.questions.length : 0); }, 0) : 0;
-    preview.innerHTML = '<div style="margin:10px 0;padding:8px 14px;background:#f0fdf4;border-radius:6px;color:#166534;font-size:13px">' +
-      '✅ 修复成功！' + (result.fixes ? result.fixes.join('、') : '') + '<br>' +
-      (data.subjects ? data.subjects.length : 0) + '个学科，' + qc + '道题' +
-      '<button class="btn-primary btn-sm" style="margin-top:6px" onclick="importFixedJSON()">确认导入</button>' +
-    '</div>';
-    window._fixedJSON = data;
-  } else {
-    preview.innerHTML = '<div style="margin:10px 0;padding:8px 14px;background:#fef2f2;border-radius:6px;color:#991b1b;font-size:13px">' +
-      '❌ 修复失败：' + result.error +
-      '<details style="margin-top:6px"><summary style="cursor:pointer">查看原文</summary>' +
-      '<pre style="margin-top:4px;padding:6px;background:var(--gray-100);border-radius:4px;font-size:11px;overflow-x:auto">' + escHtml(result.output) + '</pre></details>' +
-    '</div>';
-  }
-}
-
-function importFixedJSON() {
-  if (!window._fixedJSON) return;
-
-  function doImport(targetFileId) {
-    var file = getNode(targetFileId);
-    if (!file || file.type !== 'file') return toast('目标题库无效', 'error');
-    var data = window._fixedJSON;
-    if (data.subjects && Array.isArray(data.subjects)) {
-      data.subjects.forEach(function (sub) {
-        var qs = (sub.questions || []).map(function (q) {
-          return { id: Date.now() + Math.floor(Math.random() * 10000), type: q.type, question: q.question, options: q.options || [], answer: q.answer || '', explanation: q.explanation || '', stats: q.stats || { attempts: 0, correct: 0, wrong: 0 } };
-        });
-        qs.forEach(function (q) { file.questions.push(q); });
-      });
-    } else if (data.questions && Array.isArray(data.questions)) {
-      var qs = data.questions.map(function (q) {
-        return { id: Date.now() + Math.floor(Math.random() * 10000), type: q.type, question: q.question, options: q.options || [], answer: q.answer || '', explanation: q.explanation || '', stats: q.stats || { attempts: 0, correct: 0, wrong: 0 } };
-      });
-      qs.forEach(function (q) { file.questions.push(q); });
-    }
-    saveData(); renderSidebar(); renderBrowse();
-    document.getElementById('import-preview-json').innerHTML = ''; document.getElementById('import-json').value = '';
-    window._fixedJSON = null; toast('JSON导入成功！', 'success');
-  }
-
-  showImportPicker(doImport);
-}
-
-function importJSON() {
-  var input = document.getElementById('import-json').value.trim();
-  if (!input) return toast('请粘贴JSON', 'warning');
-  var r = fixJSON(input);
-  if (!r.success) {
-    document.getElementById('import-preview-json').innerHTML =
-      '<div style="margin:10px 0;padding:8px 14px;background:#fef2f2;border-radius:6px;color:#991b1b;font-size:13px">❌ JSON格式错误，请使用修复预览</div>';
-    return;
-  }
-  window._fixedJSON = r.output; importFixedJSON();
-}
-
 function exportData() {
   var json = JSON.stringify(appData, null, 2);
   var blob = new Blob([json], { type: 'application/json' });

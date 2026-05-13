@@ -142,6 +142,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto
 .q-card .q-footer button.btn-notes { color: var(--gray-400); }
 .q-card .q-footer button.btn-notes:hover { color: #d97706; background: #fffbeb; }
 .q-card .q-footer button.btn-notes.has-notes { color: #d97706; font-weight: 600; }
+.q-card .q-answer { margin-top: 6px; padding: 8px 12px; background: #f0fdf4; border-radius: 6px; border: 1px solid #bbf7d0; }
+.q-card .q-answer .q-answer-label { font-size: 12px; color: #166534; }
+.q-card .q-answer .q-answer-label strong { font-size: 13px; }
+.q-card .q-answer .q-explanation { font-size: 12px; color: #065f46; margin-top: 4px; padding-top: 4px; border-top: 1px dashed #bbf7d0; line-height: 1.5; }
 
 /* ===== Quiz Mode ===== */
 .quiz-setup { text-align: center; padding: 40px 20px; }

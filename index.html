@@ -155,6 +155,7 @@
     <div class="modal-tabs">
       <button class="modal-tab active" data-mtab="single" onclick="switchModalTab('single',this)">✏️ 单次添加</button>
       <button class="modal-tab" data-mtab="batch" onclick="switchModalTab('batch',this)">📥 批量导入</button>
+      <button class="modal-tab" data-mtab="file" onclick="switchModalTab('file',this)">📁 文件导入</button>
     </div>
     <div class="mtab-content active" id="mtab-single">
       <div class="field">
@@ -207,12 +208,6 @@
       </div>
     </div>
     <div class="mtab-content" id="mtab-batch">
-      <div style="margin-bottom:8px">
-        <button class="modal-subtab active" data-mstab="text" onclick="switchModalSubTab('text',this)">📄 文本解析</button>
-        <button class="modal-subtab" data-mstab="json" onclick="switchModalSubTab('json',this)">📋 JSON导入</button>
-        <button class="modal-subtab" data-mstab="file" onclick="switchModalSubTab('file',this)">📁 文件导入</button>
-      </div>
-      <div class="mstab-content active" id="mstab-text">
         <p style="font-size:12px;color:var(--gray-500);margin-bottom:6px">粘贴从学习平台复制的题目文本，自动解析为标准格式</p>
         <textarea id="import-text" placeholder="在此粘贴题目文本..."></textarea>
         <div class="import-actions">
@@ -221,18 +216,15 @@
           <button class="btn-outline" onclick="document.getElementById('import-text').value=''">清空</button>
         </div>
         <div id="import-preview-text"></div>
+      <div class="import-help">
+        <strong>📖 格式说明</strong><br>
+        <code>{ "subjects": [{ "name": "学科", "questions": [{ "type":"choice|multi|judge|fill|short", "question":"题干", "options": [{"label":"A","text":"选项"}], "answer":"A", "explanation":"解析" }] }] }</code>
       </div>
-      <div class="mstab-content" id="mstab-json">
-        <p style="font-size:12px;color:var(--gray-500);margin-bottom:6px">粘贴JSON数据，系统会自动修复不规范格式</p>
-        <textarea id="import-json" placeholder='{"subjects":[{"name":"学科名","questions":[...]}]}'></textarea>
-        <div class="import-actions">
-          <button class="btn-primary" onclick="importJSON()">📥 导入</button>
-          <button class="btn-outline" onclick="fixAndPreviewJSON()">🔧 修复预览</button>
-          <button class="btn-outline" onclick="document.getElementById('import-json').value=''">清空</button>
-        </div>
-        <div id="import-preview-json"></div>
+      <div class="modal-actions">
+        <button class="btn-cancel" onclick="hideModal('question')">关闭</button>
       </div>
-      <div class="mstab-content" id="mstab-file">
+    </div>
+    <div class="mtab-content" id="mtab-file">
         <p style="font-size:12px;color:var(--gray-500);margin-bottom:6px">支持 PDF、Word (.docx)、图片 (.png/.jpg)，自动提取文字后交给 AI 解析</p>
         <div class="file-drop-zone" id="file-drop-zone">
           <div class="file-drop-inner">
@@ -257,15 +249,10 @@
           <div id="import-preview-file"></div>
         </div>
         <div id="file-no-answer-banner" style="display:none;margin-top:8px;padding:8px 12px;background:#fffbeb;border:1px solid #fde68a;border-radius:6px;font-size:12px;color:#92400e">
-          ⚠️ 检测到部分题目没有答案，可以尝试
+          <span>⚠️ 检测到部分题目没有答案，可以尝试</span>
           <button class="btn-sm" style="background:#f59e0b;color:#fff;border:none;border-radius:4px;padding:3px 10px;cursor:pointer;margin:0 4px" onclick="aiGenerateAnswers()" id="btn-ai-gen-answers">AI 生成答案</button>
           <span style="font-size:11px;color:var(--gray-500)">（AI生成的答案仅供参考，不一定准确）</span>
         </div>
-      </div>
-      <div class="import-help">
-        <strong>📖 格式说明</strong><br>
-        <code>{ "subjects": [{ "name": "学科", "questions": [{ "type":"choice|multi|judge|fill|short", "question":"题干", "options": [{"label":"A","text":"选项"}], "answer":"A", "explanation":"解析" }] }] }</code>
-      </div>
       <div class="modal-actions">
         <button class="btn-cancel" onclick="hideModal('question')">关闭</button>
       </div>

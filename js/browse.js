@@ -63,7 +63,8 @@ function renderBrowse() {
 
   document.getElementById('stat-info').innerHTML =
     '筛选：' + filtered.length + '/' + questions.length + ' 题' +
-    ' &nbsp;<button class="filter-btn" onclick="toggleBrowseMode()" style="margin-left:8px" title="切换顺序/随机浏览">' + (currentBrowseMode === 'sequential' ? '📋 顺序' : '🔀 随机') + '</button>';
+    ' &nbsp;<button class="filter-btn" onclick="toggleBrowseMode()" style="margin-left:8px" title="切换顺序/随机浏览">' + (currentBrowseMode === 'sequential' ? '📋 顺序' : '🔀 随机') + '</button>' +
+    ' &nbsp;<button class="filter-btn" onclick="toggleShowAnswers()" style="margin-left:4px" title="显示/隐藏答案和解析">' + (showAnswers ? '👁️ 隐藏答案' : '👁️‍🗨️ 显示答案') + '</button>';
 
   if (!filtered.length) {
     list.innerHTML = ''; empty.style.display = 'block';
@@ -119,6 +120,10 @@ function renderBrowse() {
           '<span class="stat-detail">共答 ' + total + ' 次 · 对 ' + correct + ' 次 · 错 ' + wrong + ' 次</span>'
           : '<span class="stat-detail" style="color:var(--gray-300)">尚未答题</span>') +
       '</div>' +
+      (showAnswers ? '<div class="q-answer">' +
+        '<div class="q-answer-label">✅ 答案：<strong>' + escHtml(formatAnswer(q)) + '</strong></div>' +
+        (q.explanation ? '<div class="q-explanation">💡 ' + escHtml(q.explanation) + '</div>' : '') +
+      '</div>' : '') +
       '<div class="q-footer">' +
         '<button class="btn-notes' + (q.notes ? ' has-notes' : '') + '" onclick="event.stopPropagation();openNotes(' + q.id + ')" title="' + (q.notes ? '点击查看/编辑备注' : '添加备注') + '">📝 ' + (q.notes ? '有备注' : '备注') + '</button>' +
         '<button class="ask-ai" onclick="event.stopPropagation();openChat();setChatContext(' + q.id + ');askAIAboutQuestion(' + q.id + ')">🤖 问AI</button>' +
@@ -132,6 +137,26 @@ function renderBrowse() {
 function toggleBrowseMode() {
   currentBrowseMode = currentBrowseMode === 'sequential' ? 'random' : 'sequential';
   renderBrowse();
+}
+
+function toggleShowAnswers() {
+  showAnswers = !showAnswers;
+  renderBrowse();
+}
+
+function formatAnswer(q) {
+  if (!q.answer) return '(无答案)';
+  var ans = q.answer;
+  if (q.type === 'choice' || q.type === 'multi') {
+    var labels = q.type === 'multi' ? ans.replace(/[^A-Za-z]/g, '').split('') : [ans];
+    if (q.options && q.options.length) {
+      return labels.map(function (label) {
+        var opt = q.options.find(function (o) { return o.label === label; });
+        return opt ? label + '. ' + opt.text : label;
+      }).join('；');
+    }
+  }
+  return ans;
 }
 
 function filterQuestions(filter, btn) {

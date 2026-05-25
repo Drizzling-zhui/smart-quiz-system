@@ -34,17 +34,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto
 #subject-list { flex: 1; overflow-y: auto; padding: 6px; }
 
 /* Tree sidebar */
-.subject-group { margin-bottom: 2px; }
-.subject-header { display: flex; align-items: center; gap: 4px; padding: 8px 10px; border-radius: 8px; cursor: pointer; transition: background .15s; }
-.subject-header:hover { background: var(--gray-100); }
-.subject-header .subj-arrow { font-size: 10px; width: 14px; flex-shrink: 0; color: var(--gray-400); }
-.subject-header .subj-name { font-size: 13px; font-weight: 600; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.subject-header .subj-count { font-size: 11px; color: var(--gray-400); background: var(--gray-100); padding: 1px 7px; border-radius: 10px; flex-shrink: 0; }
-.subject-header .subj-actions { display: none; gap: 2px; flex-shrink: 0; }
-.subject-header:hover .subj-actions { display: flex; }
-.subj-actions button { border: none; background: none; cursor: pointer; font-size: 12px; padding: 2px 4px; border-radius: 4px; color: var(--gray-400); line-height: 1; }
-.subj-actions button:hover { background: var(--gray-200); color: var(--gray-700); }
-.subj-actions button.del:hover { color: var(--danger); }
+.subject-label { font-size: 11px; font-weight: 700; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.5px; padding: 8px 8px 2px 8px; }
+.subject-divider { height: 1px; background: var(--gray-200); margin: 6px 8px 4px; }
 
 .tree-node { display: flex; align-items: center; gap: 3px; padding: 3px 8px; border-radius: 6px; cursor: pointer; transition: background .12s; margin: 1px 0; }
 .tree-node:hover { background: var(--gray-100); }
@@ -60,7 +51,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto
 .tree-actions button:hover { background: var(--gray-200); color: var(--gray-700); }
 .tree-actions button.del:hover { color: var(--danger); }
 .tree-empty { font-size: 11px; color: var(--gray-400); padding: 4px 0 4px 18px; }
-.subject-tree { border-left: 1px solid var(--gray-200); }
 .tree-node.folder-node .tree-name { font-weight: 600; }
 .tree-node.dragging { opacity: 0.4; }
 .tree-node.drag-over { background: var(--primary-light); outline: 2px dashed var(--primary); outline-offset: -2px; }
@@ -91,6 +81,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto
 .btn-outline:hover { border-color: var(--primary); color: var(--primary); }
 .btn-success { background: var(--success); color: #fff; }
 .btn-success:hover { opacity: .9; }
+.btn-ai { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; border: none; padding: 8px 18px; border-radius: 6px; font-size: 13px; cursor: pointer; box-shadow: 0 2px 8px rgba(102,126,234,.25); transition: all .2s; }
+.btn-ai:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(102,126,234,.38); }
+.btn-ai:disabled { opacity: .6; cursor: not-allowed; transform: none; box-shadow: none; }
 .btn-sm { padding: 4px 10px !important; font-size: 12px !important; }
 .empty-state { text-align: center; padding: 50px 20px; color: var(--gray-400); }
 .empty-state .icon { font-size: 40px; margin-bottom: 10px; }
@@ -201,6 +194,20 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto
 .quiz-feedback .fb-label { font-weight: 600; font-size: 15px; margin-bottom: 3px; }
 .quiz-feedback .fb-answer { margin-top: 4px; }
 .quiz-feedback .fb-explain { margin-top: 5px; color: var(--gray-600); font-size: 12px; }
+
+.quiz-fb-actions { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+.fb-btn { font-size: 11px; padding: 5px 10px; border-radius: 5px; border: 1px solid var(--gray-200); background: #fff; cursor: pointer; transition: all .15s; color: var(--gray-600); white-space: nowrap; }
+.fb-btn:hover { border-color: var(--primary); color: var(--primary); }
+.fb-btn-ai { background: #f5f3ff; border-color: #ddd6fe; color: #7c3aed; }
+.fb-btn-ai:hover { background: #ede9fe; border-color: #c4b5fd; color: #6d28d9; }
+.fb-btn-edit:hover { border-color: #f59e0b !important; color: #d97706 !important; }
+.fb-btn-note:hover { border-color: #10b981 !important; color: #059669 !important; }
+.fb-note-preview { margin-top: 8px; padding: 6px 10px; background: #fffbeb; border-radius: 5px; font-size: 12px; color: #92400e; cursor: pointer; line-height: 1.5; white-space: pre-wrap; }
+.fb-note-preview:hover { background: #fef3c7; }
+.fb-note-editor { margin-top: 8px; }
+.fb-note-editor textarea { width: 100%; min-height: 60px; font-size: 12px; padding: 8px; border: 1px solid var(--gray-300); border-radius: 5px; resize: vertical; font-family: inherit; }
+.fb-note-editor textarea:focus { outline: none; border-color: var(--primary); }
+.fb-note-editor-btns { margin-top: 6px; display: flex; gap: 6px; }
 
 .quiz-nav { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; gap: 8px; flex-wrap: wrap; }
 .quiz-nav button { padding: 8px 20px; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; transition: all .2s; font-weight: 500; }

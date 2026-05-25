@@ -261,12 +261,28 @@ function renderQuizQuestion() {
 
   var feedbackHtml = '';
   if (isSubmitted) {
+    var noteHtml = '';
+    if (q.note) {
+      noteHtml = '<div class="fb-note-preview" id="fb-note-display-' + q.id + '" onclick="event.stopPropagation();toggleQuizNote(' + q.id + ')">📝 ' + escHtml(q.note) + '</div>';
+    }
     feedbackHtml = '<div class="quiz-feedback ' + (sub.correct ? 'correct' : 'wrong') + '">' +
       '<div class="fb-label">' + (sub.correct ? '✅ 回答正确！' : '❌ 回答错误') + '</div>' +
       (!sub.correct ? '<div class="fb-answer">' + (q.type === 'choice' ? '正确答案：' + q.answer : '参考答案：' + escHtml(q.answer)) + '</div>' : '') +
       (q.explanation ? '<div class="fb-explain">💡 ' + escHtml(q.explanation) + '</div>' : '') +
       (sub.attempts > 1 ? '<div class="fb-explain" style="margin-top:4px;color:var(--warning)">本题已答 ' + sub.attempts + ' 次</div>' : '') +
-      '<button class="ask-ai" onclick="event.stopPropagation();openChat();setChatContext(' + q.id + ')" style="margin-top:8px">🤖 AI 提问</button>' +
+      noteHtml +
+      '<div class="quiz-fb-actions">' +
+        '<button class="fb-btn fb-btn-ai" onclick="event.stopPropagation();openChat();setChatContext(' + q.id + ')">🤖 AI 提问</button>' +
+        '<button class="fb-btn fb-btn-edit" onclick="event.stopPropagation();editQuestion(' + q.id + ')">✏️ 编辑题目</button>' +
+        '<button class="fb-btn fb-btn-note" id="fb-btn-note-' + q.id + '" onclick="event.stopPropagation();toggleQuizNote(' + q.id + ')">' + (q.note ? '📝 编辑备注' : '📝 添加备注') + '</button>' +
+      '</div>' +
+      '<div class="fb-note-editor" id="fb-note-editor-' + q.id + '" style="display:none">' +
+        '<textarea id="fb-note-ta-' + q.id + '" placeholder="添加个人备注...">' + escHtml(q.note || '') + '</textarea>' +
+        '<div class="fb-note-editor-btns">' +
+          '<button class="btn-primary btn-sm" onclick="event.stopPropagation();saveQuizNote(' + q.id + ')">保存</button>' +
+          '<button class="btn-outline btn-sm" onclick="event.stopPropagation();toggleQuizNote(' + q.id + ')">取消</button>' +
+        '</div>' +
+      '</div>' +
     '</div>';
   }
 
@@ -486,4 +502,45 @@ function retryWrongQuiz() {
   document.getElementById('quiz-playing').style.display = 'block';
   renderQuizQuestion();
   toast('开始重做 ' + wrong.length + ' 道错题', 'info');
+}
+
+function toggleQuizNote(qId) {
+  var editor = document.getElementById('fb-note-editor-' + qId);
+  var display = document.getElementById('fb-note-display-' + qId);
+  if (!editor) return;
+  var isShowing = editor.style.display !== 'none';
+  editor.style.display = isShowing ? 'none' : 'block';
+  if (!isShowing) {
+    var ta = document.getElementById('fb-note-ta-' + qId);
+    if (ta) ta.focus();
+  }
+}
+
+function saveQuizNote(qId) {
+  var ta = document.getElementById('fb-note-ta-' + qId);
+  if (!ta) return;
+  var note = ta.value.trim();
+  var q = findQuestionById(qId);
+  if (!q) return toast('题目未找到', 'error');
+  q.note = note;
+  saveData();
+  if (note) {
+    var display = document.getElementById('fb-note-display-' + qId);
+    if (display) {
+      display.textContent = '📝 ' + note;
+      display.style.display = 'block';
+    } else {
+      // Note display doesn't exist yet, re-render
+      renderQuizQuestion();
+      return;
+    }
+  } else {
+    var display = document.getElementById('fb-note-display-' + qId);
+    if (display) display.style.display = 'none';
+  }
+  var btn = document.getElementById('fb-btn-note-' + qId);
+  if (btn) btn.textContent = note ? '📝 编辑备注' : '📝 添加备注';
+  var editor = document.getElementById('fb-note-editor-' + qId);
+  if (editor) editor.style.display = 'none';
+  toast(note ? '备注已保存' : '备注已删除', 'success');
 }

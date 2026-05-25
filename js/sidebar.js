@@ -8,43 +8,14 @@ function renderSidebar() {
     return;
   }
   var html = '';
-  appData.subjects.forEach(function (s) {
+  appData.subjects.forEach(function (s, idx) {
     var root = getRootNode(s);
     if (!root) return;
-    var total = countQuestionsInNode(root.id);
-    html += '<div class="subject-group">' +
-      '<div class="subject-header" onclick="toggleSubject(\'' + escHtml(s.name) + '\')">' +
-        '<span class="subj-arrow" id="subj-arrow-' + escHtml(s.name) + '">' + (root.expanded !== false ? '▼' : '▶') + '</span>' +
-        '<span class="subj-name">' + escHtml(s.name) + '</span>' +
-        '<span class="subj-count">' + total + '</span>' +
-        '<span class="subj-actions">' +
-          '<button onclick="event.stopPropagation();promptNewFolder(\'' + root.id + '\')" title="新建文件夹">📁+</button>' +
-          '<button onclick="event.stopPropagation();promptNewFile(\'' + root.id + '\')" title="新建题库">📄+</button>' +
-          '<button onclick="event.stopPropagation();promptRenameSubject(\'' + escHtml(s.name) + '\')" title="重命名">✏️</button>' +
-          '<button class="del" onclick="event.stopPropagation();confirmAction(\'删除学科「' + escHtml(s.name) + '」及其全部内容？\',function(){deleteSubject(\'' + escHtml(s.name) + '\')})" title="删除">🗑️</button>' +
-        '</span>' +
-      '</div>' +
-      '<div class="subject-tree" id="subj-tree-' + escHtml(s.name.replace(/\s/g, '_')) + '" style="' + (root.expanded !== false ? '' : 'display:none') + '">' +
-        renderChildren(root.id, s, 0) +
-      '</div>' +
-    '</div>';
+    if (idx > 0) html += '<div class="subject-divider"></div>';
+    html += '<div class="subject-label">' + escHtml(s.name) + '</div>';
+    html += renderTreeNode(root, s, 0);
   });
   c.innerHTML = html;
-}
-
-function renderChildren(parentId, subject, depth) {
-  var children = getChildrenNodes(parentId, subject);
-  if (!children.length) {
-    return '<div class="tree-empty" style="padding-left:' + (14 + depth * 18) + 'px">空文件夹</div>';
-  }
-  // Sort: folders first (A-Z), then files (A-Z)
-  children.sort(function (a, b) {
-    if (a.type !== b.type) return a.type === 'folder' ? -1 : 1;
-    return a.name.localeCompare(b.name, 'zh-CN');
-  });
-  return children.map(function (node) {
-    return renderTreeNode(node, subject, depth);
-  }).join('');
 }
 
 function renderTreeNode(node, subject, depth) {
@@ -120,16 +91,6 @@ function toggleFolder(nodeId) {
   renderSidebar();
 }
 
-function toggleSubject(name) {
-  var subj = getSubject(name);
-  if (!subj) return;
-  var root = getRootNode(subj);
-  if (!root) return;
-  root.expanded = root.expanded === false ? true : false;
-  saveData();
-  renderSidebar();
-}
-
 function promptNewFolder(parentId) {
   var name = prompt('新建文件夹名称：');
   if (!name || !name.trim()) return;
@@ -186,6 +147,11 @@ function renameNode(nodeId, newName) {
   var node = getNode(nodeId);
   if (!node) return;
   node.name = newName;
+  // Root node: also rename the subject
+  if (node.parentId === null) {
+    var subject = getSubjectByNodeId(nodeId);
+    if (subject) subject.name = newName;
+  }
   saveData();
   renderSidebar();
   renderBrowse();
@@ -195,6 +161,12 @@ function renameNode(nodeId, newName) {
 function deleteNode(nodeId) {
   var subject = getSubjectByNodeId(nodeId);
   if (!subject) return;
+  var node = getNode(nodeId);
+  // Root node: delete the entire subject
+  if (node && node.parentId === null) {
+    deleteSubject(subject.name);
+    return;
+  }
   // Recursively delete all children
   var toDelete = [nodeId];
   collectDescendantIds(nodeId, subject, toDelete);

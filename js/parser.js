@@ -139,9 +139,30 @@ function importParsedQuestions() {
   showImportPicker(doImport);
 }
 
+// Count expected questions in a chunk by detecting number patterns
+function _countExpectedQuestions(text) {
+  var boundaries = _detectQuestionBoundaries(text);
+  if (boundaries.length > 0) {
+    return { count: boundaries.length, numbers: boundaries.map(function (b) { return b.index; }) };
+  }
+  return { count: 0, numbers: [] };
+}
+
 // Shared: call AI API and return parsed questions array
 // text: user text, cfg: API config, fileMode: if true, mark unanswered as aiGenerated
-function _callAIParse(text, cfg, fileMode) {
+// opts: { expectedCount, questionNumbers, isRetry }
+function _callAIParse(text, cfg, fileMode, opts) {
+  opts = opts || {};
+  var expected = opts.expectedCount || 0;
+  var qNumbers = opts.questionNumbers || [];
+
+  // Auto-detect expected count if not provided
+  if (!expected) {
+    var detected = _countExpectedQuestions(text);
+    expected = detected.count;
+    qNumbers = detected.numbers;
+  }
+
   var systemPrompt = '你是一个专业的题目解析助手，从用户提供的文本中提取所有题目，返回JSON数组。\n\n' +
     '核心规则（严格遵守）：\n' +
     '1. 题干(question) = 纯题目文字，不要把答案、选项、解析混入题干\n' +
@@ -150,14 +171,29 @@ function _callAIParse(text, cfg, fileMode) {
     '4. 如果原文同时出现"我的答案"和"正确答案"，以"正确答案"为准\n' +
     '5. 类型(type)：choice=单选, multi=多选, judge=判断, fill=填空, short=简答\n' +
     '6. 解析(explanation) = 提取原文中的答案解析，没有则为空字符串""\n' +
-    (fileMode ? '7. aiGenerated = 没有答案的题目设为true，有答案的设为false\n\n' : '\n') +
-    '输出格式：只返回一个```json代码块，不要任何其他说明文字。';
+    '7. 【极其重要】每道题必须包含 originalIndex 字段，值严格等于该题在原文中的题号数字（如原文"1."开头的题目，originalIndex必须为1；原文"二、"开头的题目，originalIndex必须为2）。原始题号是识别题目的唯一标识，绝对不能省略或填错！\n' +
+    '8. 即使两道题题干看起来相似，只要题号不同就是不同的题目，必须全部解析输出，一条都不能少！\n' +
+    (fileMode ? '9. aiGenerated = 没有答案的题目设为true，有答案的设为false\n\n' : '\n');
+
+  if (expected > 0) {
+    systemPrompt += '⚠️ 重要提醒：本段文本中应包含 ' + expected + ' 道题目';
+    if (qNumbers.length > 0 && qNumbers.length <= 30) {
+      systemPrompt += '，题号为：' + qNumbers.join(', ');
+    }
+    systemPrompt += '。请确保每一道题都被解析出来，不要遗漏任何一题！如果某道题内容不完整也要保留，宁多勿漏。\n\n';
+  } else {
+    systemPrompt += '⚠️ 重要提醒：请仔细识别文本中的所有题目编号（如1、2、3或一、二、三等），确保每一道题都被完整解析，不要遗漏任何一题！\n\n';
+  }
+
+  systemPrompt += '输出格式：只返回一个```json代码块，不要任何其他说明文字。';
+
+  var userContent = '请解析以下文本中的所有题目（共' + (expected > 0 ? expected + '道' : '若干道') + '）：\n\n' + text;
 
   var body = {
     model: cfg.model,
     messages: [
       { role: 'system', content: systemPrompt },
-      { role: 'user', content: '请解析以下文本中的题目：\n\n' + text }
+      { role: 'user', content: userContent }
     ],
     max_tokens: 16384,
     temperature: 0.1
@@ -219,28 +255,236 @@ function _callAIParse(text, cfg, fileMode) {
         q.type = 'judge';
       }
     });
+
+    // Verify: if expected count is known and we got fewer, retry for missing ones
+    if (expected > 0 && questions.length < expected && !opts.isRetry) {
+      var parsedIndices = {};
+      var hasAnyIndex = false;
+      questions.forEach(function (q) {
+        if (q.originalIndex) { parsedIndices[q.originalIndex] = true; hasAnyIndex = true; }
+      });
+      var missing = qNumbers.filter(function (n) { return !parsedIndices[n]; });
+
+      if (missing.length > 0) {
+        var retryPrompt;
+        if (hasAnyIndex && missing.length <= 30) {
+          retryPrompt = '你漏掉了以下题号的题目：' + missing.join(', ') +
+            '\n请从下面的原文中找出这些特定题号的题目并解析，返回JSON数组。\n\n' + text;
+        } else {
+          retryPrompt = '你只返回了 ' + questions.length + ' 道题，但原文中有 ' + expected + ' 道题。请重新仔细解析整个文本，确保每一道题（按题号识别）都被解析出来，一道都不能漏！\n\n' + text;
+        }
+        var retryBody = {
+          model: cfg.model,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: retryPrompt }
+          ],
+          max_tokens: 16384,
+          temperature: 0.1
+        };
+        if (typeof chatFastMode !== 'undefined' && chatFastMode) {
+          retryBody.thinking = { type: 'disabled' };
+        }
+        return fetch(cfg.endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + cfg.key },
+          body: JSON.stringify(retryBody)
+        }).then(function (r2) {
+          if (!r2.ok) return questions;
+          return r2.json();
+        }).then(function (data2) {
+          if (!data2.choices || !data2.choices[0]) return questions;
+          var content2 = data2.choices[0].message.content || '';
+          var jsonStr2 = '';
+          var codeMatch2 = content2.match(/```(?:json)?\s*([\s\S]*?)```/);
+          if (codeMatch2) jsonStr2 = codeMatch2[1].trim();
+          else {
+            var arrMatch2 = content2.match(/\[[\s\S]*\]/);
+            if (arrMatch2) jsonStr2 = arrMatch2[0];
+          }
+          if (!jsonStr2) return questions;
+          var fixResult2 = fixJSON(jsonStr2);
+          if (!fixResult2.success || !fixResult2.output) return questions;
+          var extraQs = Array.isArray(fixResult2.output) ? fixResult2.output : (fixResult2.output.questions || []);
+          extraQs.forEach(function (q) {
+            if (!q.type) q.type = 'choice';
+            if (!q.explanation) q.explanation = '';
+            if (!q.options) q.options = [];
+            if (!q.stats) q.stats = { attempts: 0, correct: 0, wrong: 0 };
+            if (!q.answer) q.answer = '';
+            if (fileMode) q.aiGenerated = !q.answer;
+            if ((q.type === 'choice' || q.type === 'judge') && q.options && q.options.length && q.answer) {
+              var lm = q.answer.match(/[A-Da-d]/);
+              if (lm) q.answer = lm[0].toUpperCase();
+            }
+            if (q.type === 'multi' && q.options && q.options.length && q.answer) {
+              q.answer = q.answer.replace(/[^A-Za-z]/g, '').toUpperCase();
+            }
+            if ((!q.type || q.type === 'choice') && (q.answer === '正确' || q.answer === '错误')) {
+              q.type = 'judge';
+            }
+          });
+          // Merge: use originalIndex as primary identity, only dedup exact matches
+          var existingIdx = {};
+          var existingKeys = {};
+          questions.forEach(function (q) {
+            if (q.originalIndex) existingIdx[q.originalIndex] = q;
+            existingKeys[JSON.stringify({ q: q.question, o: q.options })] = true;
+          });
+          extraQs.forEach(function (q) {
+            if (q.originalIndex && existingIdx[q.originalIndex]) {
+              // Same index: keep the more complete one
+              var prev = existingIdx[q.originalIndex];
+              if ((q.answer && !prev.answer) || (q.options && q.options.length > (prev.options || []).length)) {
+                var pi = questions.indexOf(prev);
+                if (pi >= 0) questions[pi] = q;
+                existingIdx[q.originalIndex] = q;
+              }
+              return;
+            }
+            var key = JSON.stringify({ q: q.question, o: q.options });
+            if (existingKeys[key]) return;
+            if (q.originalIndex) existingIdx[q.originalIndex] = q;
+            existingKeys[key] = true;
+            questions.push(q);
+          });
+          return questions;
+        }).catch(function () { return questions; });
+      }
+    }
+
     return questions;
   });
 }
 
-// Split long text into chunks at logical boundaries (double newlines)
+// Detect question number boundaries in text, returns array of {index, pos, raw}
+function _detectQuestionBoundaries(text) {
+  var patterns = [
+    /(?:^|\n)\s*(\d+)\s*[.．、）)]\s*/g,
+    /(?:^|\n)\s*[（(](\d+)[)）]\s*/g,
+    /(?:^|\n)\s*第\s*(\d+)\s*题/g,
+    /(?:^|\n)\s*([一二三四五六七八九十百]+)\s*[.．、）)]\s*/g
+  ];
+  var chineseNumMap = { '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9, '十': 10,
+    '十一': 11, '十二': 12, '十三': 13, '十四': 14, '十五': 15, '十六': 16, '十七': 17, '十八': 18, '十九': 19, '二十': 20,
+    '二十一': 21, '二十二': 22, '二十三': 23, '二十四': 24, '二十五': 25, '三十': 30, '四十': 40, '五十': 50 };
+
+  var bestResults = [];
+  patterns.forEach(function (pat) {
+    var results = [];
+    var m;
+    var copy = new RegExp(pat.source, pat.flags);
+    while ((m = copy.exec(text)) !== null) {
+      var numStr = m[1];
+      var num = parseInt(numStr);
+      if (isNaN(num)) num = chineseNumMap[numStr] || 0;
+      if (num > 0) {
+        var pos = m.index;
+        if (text[pos] === '\n') pos++;
+        results.push({ index: num, pos: pos, raw: m[0] });
+      }
+    }
+    if (results.length > bestResults.length) bestResults = results;
+  });
+
+  if (bestResults.length < 2) return [];
+
+  // Validate: check if numbers form a reasonable sequence (mostly increasing)
+  var sorted = bestResults.slice().sort(function (a, b) { return a.pos - b.pos; });
+  var sequential = 0;
+  for (var i = 1; i < sorted.length; i++) {
+    if (sorted[i].index > sorted[i - 1].index) sequential++;
+  }
+  if (sequential < sorted.length * 0.5) return [];
+
+  // Remove duplicates keeping first occurrence, filter out-of-sequence noise
+  var seen = {};
+  var filtered = [];
+  sorted.forEach(function (item) {
+    if (!seen[item.index]) {
+      seen[item.index] = true;
+      filtered.push(item);
+    }
+  });
+  return filtered;
+}
+
+// Split long text into chunks at question boundaries
 var AI_MAX_CHARS_PER_CHUNK = 10000;
 function _chunkText(text) {
   if (text.length <= AI_MAX_CHARS_PER_CHUNK) return [text];
+
+  var boundaries = _detectQuestionBoundaries(text);
+
+  // If we found question boundaries, split at them
+  if (boundaries.length >= 2) {
+    return _chunkByBoundaries(text, boundaries);
+  }
+
+  // Fallback: split at paragraph boundaries
   var chunks = [];
   var paragraphs = text.split(/\n\n+/);
   var current = '';
+
+  function flush() { if (current) { chunks.push(current); current = ''; } }
+
+  function forceSplit(block) {
+    var lines = block.split(/\n/);
+    lines.forEach(function (line) {
+      line = line.trim();
+      if (!line) return;
+      if (current && current.length + line.length + 1 > AI_MAX_CHARS_PER_CHUNK) flush();
+      current = current ? current + '\n' + line : line;
+      while (current.length > AI_MAX_CHARS_PER_CHUNK) {
+        var overflow = current.slice(AI_MAX_CHARS_PER_CHUNK);
+        current = current.slice(0, AI_MAX_CHARS_PER_CHUNK);
+        flush();
+        current = overflow;
+      }
+    });
+  }
+
   paragraphs.forEach(function (p) {
     p = p.trim();
     if (!p) return;
-    if (current && current.length + p.length + 2 > AI_MAX_CHARS_PER_CHUNK) {
-      chunks.push(current);
-      current = p;
-    } else {
-      current = current ? current + '\n\n' + p : p;
+    if (p.length > AI_MAX_CHARS_PER_CHUNK) {
+      flush();
+      forceSplit(p);
+      flush();
+      return;
     }
+    if (current && current.length + p.length + 2 > AI_MAX_CHARS_PER_CHUNK) flush();
+    current = current ? current + '\n\n' + p : p;
   });
-  if (current) chunks.push(current);
+  flush();
+  return chunks.length ? chunks : [text];
+}
+
+function _chunkByBoundaries(text, boundaries) {
+  var chunks = [];
+  var currentStart = 0;
+  var currentChunkBoundaryIdx = 0;
+
+  for (var i = 0; i < boundaries.length; i++) {
+    var endPos = (i + 1 < boundaries.length) ? boundaries[i + 1].pos : text.length;
+    var chunkLen = endPos - boundaries[currentChunkBoundaryIdx].pos;
+
+    if (chunkLen > AI_MAX_CHARS_PER_CHUNK && i > currentChunkBoundaryIdx) {
+      // Flush current accumulated questions as one chunk
+      var prefix = currentStart < boundaries[currentChunkBoundaryIdx].pos
+        ? text.slice(currentStart, boundaries[currentChunkBoundaryIdx].pos) : '';
+      var chunkText = prefix + text.slice(boundaries[currentChunkBoundaryIdx].pos, boundaries[i].pos);
+      chunks.push(chunkText.trim());
+      currentStart = boundaries[i].pos;
+      currentChunkBoundaryIdx = i;
+    }
+  }
+  // Last chunk
+  var lastPrefix = currentStart < boundaries[currentChunkBoundaryIdx].pos
+    ? text.slice(currentStart, boundaries[currentChunkBoundaryIdx].pos) : '';
+  var lastChunk = lastPrefix + text.slice(boundaries[currentChunkBoundaryIdx].pos);
+  if (lastChunk.trim()) chunks.push(lastChunk.trim());
+
   return chunks.length ? chunks : [text];
 }
 
@@ -252,6 +496,8 @@ function aiParseText() {
   btn.textContent = '⏳ AI解析中...'; btn.disabled = true;
   var cfg = getApiConfig();
 
+  // Detect total expected questions for the whole text
+  var totalExpected = _countExpectedQuestions(text);
   var chunks = _chunkText(text);
   var allQuestions = [];
   var errors = [];
@@ -267,19 +513,42 @@ function aiParseText() {
           '<button class="btn-outline btn-sm" style="margin-left:4px" onclick="document.getElementById(\'import-preview-text\').innerHTML=\'\'">关闭</button></div>';
         return toast('AI解析失败：' + errors[0], 'error');
       }
-      // Deduplicate (questions might appear in multiple chunks)
-      var seen = {};
+      // Deduplicate using originalIndex as primary identity
+      // Only dedup by content when FULL question+options are identical
+      var seenIdx = {};
+      var seenKeys = {};
       allQuestions = allQuestions.filter(function (q) {
-        var key = (q.question || '').slice(0, 40);
-        if (seen[key]) return false;
-        seen[key] = true;
+        if (q.originalIndex) {
+          if (seenIdx[q.originalIndex]) {
+            // Same index: keep the one with more data
+            var prev = seenIdx[q.originalIndex];
+            if ((q.answer && !prev.answer) || (q.options && q.options.length > (prev.options || []).length)) {
+              var prevIdx = allQuestions.indexOf(prev);
+              if (prevIdx >= 0) allQuestions[prevIdx] = q;
+              seenIdx[q.originalIndex] = q;
+            }
+            return false;
+          }
+          seenIdx[q.originalIndex] = q;
+          return true;
+        }
+        // No originalIndex: only dedup if EXACT question+options match
+        var key = JSON.stringify({ q: q.question, o: q.options });
+        if (seenKeys[key]) return false;
+        seenKeys[key] = true;
         return true;
+      });
+      // Sort by originalIndex if available
+      allQuestions.sort(function (a, b) {
+        if (a.originalIndex && b.originalIndex) return a.originalIndex - b.originalIndex;
+        return 0;
       });
       window._parsedQ = allQuestions;
       _renderParsePreview('text', allQuestions, null);
       var msg = 'AI解析出 ' + allQuestions.length + ' 道题';
+      if (totalExpected.count > 0) msg += '（预期 ' + totalExpected.count + ' 道）';
       if (errors.length) msg += '（' + errors.length + '段失败）';
-      toast(msg, 'success');
+      toast(msg, allQuestions.length >= totalExpected.count ? 'success' : 'warning');
       return;
     }
     btn.textContent = '⏳ 解析中 ' + (i + 1) + '/' + chunks.length + '...';
@@ -498,6 +767,7 @@ function _aiParseToFilePreview(text) {
   var cfg = getApiConfig();
   var preview = document.getElementById('import-preview-file');
 
+  var totalExpected = _countExpectedQuestions(text);
   var chunks = _chunkText(text);
   var allQuestions = [];
   var errors = [];
@@ -512,18 +782,37 @@ function _aiParseToFilePreview(text) {
           '<button class="btn-outline btn-sm" style="margin-left:4px" onclick="document.getElementById(\'import-preview-file\').innerHTML=\'\'">关闭</button></div>';
         return toast('AI解析失败：' + errors[0], 'error');
       }
-      var seen = {};
+      var seenIdx = {};
+      var seenKeys = {};
       allQuestions = allQuestions.filter(function (q) {
-        var key = (q.question || '').slice(0, 40);
-        if (seen[key]) return false;
-        seen[key] = true;
+        if (q.originalIndex) {
+          if (seenIdx[q.originalIndex]) {
+            var prev = seenIdx[q.originalIndex];
+            if ((q.answer && !prev.answer) || (q.options && q.options.length > (prev.options || []).length)) {
+              var prevIdx = allQuestions.indexOf(prev);
+              if (prevIdx >= 0) allQuestions[prevIdx] = q;
+              seenIdx[q.originalIndex] = q;
+            }
+            return false;
+          }
+          seenIdx[q.originalIndex] = q;
+          return true;
+        }
+        var key = JSON.stringify({ q: q.question, o: q.options });
+        if (seenKeys[key]) return false;
+        seenKeys[key] = true;
         return true;
+      });
+      allQuestions.sort(function (a, b) {
+        if (a.originalIndex && b.originalIndex) return a.originalIndex - b.originalIndex;
+        return 0;
       });
       window._fileParsedQ = allQuestions;
       _renderParsePreview('file', allQuestions, null);
       var msg = 'AI解析出 ' + allQuestions.length + ' 道题';
+      if (totalExpected.count > 0) msg += '（预期 ' + totalExpected.count + ' 道）';
       if (errors.length) msg += '（' + errors.length + '段失败）';
-      toast(msg, 'success');
+      toast(msg, allQuestions.length >= totalExpected.count ? 'success' : 'warning');
       return;
     }
     btn.textContent = '⏳ 解析中 ' + (i + 1) + '/' + chunks.length + '...';
@@ -639,13 +928,14 @@ function aiGenerateAnswers() {
   btn.textContent = '⏳ 生成中...'; btn.disabled = true;
 
   var cfg = getApiConfig();
-  var systemPrompt = '你是一个专业的题目解答助手。用户会提供几道没有答案的题目（JSON格式），请你为每道题生成正确答案。\n\n' +
+  var systemPrompt = '你是一个专业的题目解答助手。用户会提供几道没有答案的题目（JSON格式），请你为每道题生成答案。\n\n' +
     '规则：\n' +
     '1. 选择题只返回选项字母(A/B/C/D)，多选如"ABD"\n' +
     '2. 判断题只返回"正确"或"错误"\n' +
     '3. 填空/简答返回关键答案（简洁）\n' +
-    '4. 返回格式：{"answers": [{"id": 题目在数组中的索引, "answer": "答案"}]}\n' +
-    '5. 不要返回其他任何文字，只返回JSON。';
+    '4. 返回格式：{"answers": [{"id": 题目在数组中的索引, "answer": "答案", "reasoning": "推理过程（一句话）", "confidence": "high/medium/low"}]}\n' +
+    '5. 不要返回其他任何文字，只返回JSON。\n\n' +
+    '重要：请认真审题，独立推理。如果对某道题拿不准，confidence标"low"，reasoning中说明哪里不确定。不要硬猜。';
 
   var body = {
     model: cfg.model,
@@ -693,6 +983,8 @@ function aiGenerateAnswers() {
       if (q && !q.answer && a.answer) {
         q.answer = a.answer;
         q.aiGenerated = true;
+        q.aiConfidence = a.confidence || 'medium';
+        q.aiReasoning = a.reasoning || '';
         filled++;
       }
     });
@@ -716,7 +1008,12 @@ function aiGenerateAnswers() {
       var typeLabel = typeMap2[q.type] || q.type;
       var qText = (q.question || '').slice(0, 50);
       if ((q.question || '').length > 50) qText += '...';
-      var aiBadge = q.aiGenerated ? ' <span style="font-size:10px;background:#dbeafe;color:#1e40af;padding:1px 5px;border-radius:3px">AI答案</span>' : '';
+      var aiBadge = '';
+      if (q.aiGenerated) {
+        var confColor = q.aiConfidence === 'low' ? '#fef2f2;color:#991b1b' : (q.aiConfidence === 'high' ? '#f0fdf4;color:#166534' : '#fefce8;color:#854d0e');
+        var confLabel = q.aiConfidence === 'low' ? 'AI答案⚠' : 'AI答案';
+        aiBadge = ' <span style="font-size:10px;background:' + confColor.split(';')[0] + ';color:' + confColor.split(';')[1] + ';padding:1px 5px;border-radius:3px">' + confLabel + '</span>';
+      }
       var noAnsBadge = !q.answer ? ' <span style="font-size:10px;background:#fef3c7;color:#92400e;padding:1px 5px;border-radius:3px">无答案</span>' : '';
       previewHtml += '<div class="pv-item"><span class="status">✅</span> #' + (i + 1) + ' [' + typeLabel + '] ' + escHtml(qText) + aiBadge + noAnsBadge + '</div>';
     });

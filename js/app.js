@@ -47,3 +47,4 @@ document.addEventListener('keydown', function (e) {
 console.log('📚 智能题库系统 v2 已加载');
 updateFastModeBtn();
 initFileSync();
+setTimeout(function () { checkQuizResume(); }, 300);

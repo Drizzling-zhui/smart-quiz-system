@@ -102,6 +102,7 @@ function selectQuizMode(mode, el) {
 
 function renderQuizSetup() {
   quizState.started = false;
+  clearQuizResume();
   document.getElementById('quiz-setup').style.display = 'block';
   document.getElementById('quiz-playing').style.display = 'none';
   document.getElementById('quiz-result-area').style.display = 'none';
@@ -169,6 +170,8 @@ function startQuiz() {
   quizState.currentIdx = 0;
   quizState.submitted = [];
   quizState.started = true;
+  clearQuizResume();
+  saveQuizResume();
 
   document.getElementById('quiz-setup').style.display = 'none';
   document.getElementById('quiz-playing').style.display = 'block';
@@ -182,11 +185,56 @@ function startQuiz() {
   renderQuizQuestion();
 }
 
+function jumpToQuestion(idx) {
+  if (idx < 0 || idx >= quizState.questions.length) return;
+  quizState.currentIdx = idx;
+  renderQuizQuestion();
+  saveQuizResume();
+}
+
+var _quizNumGridCollapsed = false;
+
+function toggleQuizNumGrid() {
+  _quizNumGridCollapsed = !_quizNumGridCollapsed;
+  var grid = document.getElementById('quiz-num-grid');
+  var toggle = document.getElementById('quiz-num-toggle');
+  if (grid) grid.classList.toggle('collapsed', _quizNumGridCollapsed);
+  if (toggle) toggle.textContent = _quizNumGridCollapsed ? '▼' : '▲';
+}
+
+function renderQuizNumGrid() {
+  var grid = document.getElementById('quiz-num-grid');
+  if (!grid) return;
+  var questions = quizState.questions;
+  var currentIdx = quizState.currentIdx;
+  var submitted = quizState.submitted;
+  var answered = submitted.filter(function (s) { return s.attempts > 0; }).length;
+  var correct = submitted.filter(function (s) { return s.correct; }).length;
+
+  var html = '';
+  for (var i = 0; i < questions.length; i++) {
+    var sub = submitted.find(function (s) { return s.qId === questions[i].id; });
+    var cls = 'quiz-num-item';
+    if (i === currentIdx) cls += ' current';
+    if (sub && sub.attempts > 0) {
+      cls += sub.correct ? ' answered' : ' answered-wrong';
+    }
+    html += '<div class="' + cls + '" onclick="jumpToQuestion(' + i + ')" title="第' + (i + 1) + '题' + (sub && sub.attempts > 0 ? (sub.correct ? ' ✅' : ' ❌') : '') + '">' + (i + 1) + '</div>';
+  }
+  grid.innerHTML = html;
+  if (_quizNumGridCollapsed) grid.classList.add('collapsed');
+
+  var summary = document.getElementById('quiz-num-summary');
+  if (summary) summary.textContent = '已答 ' + answered + ' · 对 ' + correct + ' · 错 ' + (answered - correct);
+}
+
 function renderQuizQuestion() {
   var questions = quizState.questions;
   var currentIdx = quizState.currentIdx;
   var submitted = quizState.submitted;
   if (!questions.length || currentIdx >= questions.length) return finishQuiz();
+
+  renderQuizNumGrid();
 
   var q = questions[currentIdx];
   var sub = submitted.find(function (s) { return s.qId === q.id; });
@@ -310,6 +358,7 @@ function renderQuizQuestion() {
     '<div>' +
       '<button class="btn-prev" onclick="prevQuizQuestion()" ' + (canPrev ? '' : 'disabled') + '>← 上一题</button>' +
       '<button class="btn-quit" onclick="confirmAction(\'确定要退出答题吗？\', renderQuizSetup)">退出</button>' +
+      '<button class="btn-finish" onclick="confirmAction(\'确定要提前结束答题并查看结果吗？未作答的题目将计为未答。\', finishQuiz)">结果统计</button>' +
     '</div>' +
     '<div>' +
       submitBtn +
@@ -339,6 +388,7 @@ function toggleMultiOption(label) {
   }
   quizState.submitted.push({ qId: q.id, userAnswer: current, correct: false, attempts: 0 });
   renderQuizQuestion();
+  saveQuizResume();
 }
 
 function selectQuizOption(label) {
@@ -350,14 +400,16 @@ function selectQuizOption(label) {
   if (idx >= 0) quizState.submitted.splice(idx, 1);
   quizState.submitted.push({ qId: q.id, userAnswer: label, correct: false, attempts: 0 });
   renderQuizQuestion();
+  saveQuizResume();
 }
 
 function setQuizFillAnswer(val) {
   var q = quizState.questions[quizState.currentIdx];
   if (!q) return;
   var existing = quizState.submitted.find(function (s) { return s.qId === q.id && s.attempts === 0; });
-  if (existing) { existing.userAnswer = val; return; }
+  if (existing) { existing.userAnswer = val; saveQuizResume(); return; }
   quizState.submitted.push({ qId: q.id, userAnswer: val, correct: false, attempts: 0 });
+  saveQuizResume();
 }
 
 function submitQuizAnswer() {
@@ -396,6 +448,7 @@ function submitQuizAnswer() {
 
   sub.attempts++;
   saveData();
+  saveQuizResume();
   renderSidebar();
   renderQuizQuestion();
 }
@@ -404,6 +457,7 @@ function nextQuizQuestion() {
   if (quizState.currentIdx < quizState.questions.length - 1) {
     quizState.currentIdx++;
     renderQuizQuestion();
+    saveQuizResume();
   } else {
     finishQuiz();
   }
@@ -413,6 +467,7 @@ function prevQuizQuestion() {
   if (quizState.currentIdx > 0) {
     quizState.currentIdx--;
     renderQuizQuestion();
+    saveQuizResume();
   }
 }
 
@@ -429,12 +484,14 @@ function finishQuiz() {
   });
 
   var total = questions.length;
-  var pct = total > 0 ? Math.round((correct / total) * 100) : 0;
+  var attempted = correct + wrong;
+  var pct = attempted > 0 ? Math.round((correct / attempted) * 100) : 0;
   var grade = 'poor', gradeText = '继续加油！';
   if (pct >= 90) { grade = 'perfect'; gradeText = '太棒了！🎉'; }
   else if (pct >= 70) { grade = 'good'; gradeText = '不错！继续保持 💪'; }
   else if (pct >= 50) { grade = 'fair'; gradeText = '还需努力 📚'; }
 
+  clearQuizResume();
   document.getElementById('quiz-playing').style.display = 'none';
   var resultArea = document.getElementById('quiz-result-area');
   resultArea.style.display = 'block';
@@ -469,12 +526,12 @@ function finishQuiz() {
     '<div class="quiz-result">' +
       '<div class="score-circle ' + grade + '">' + pct + '%</div>' +
       '<h2 style="margin-bottom:4px;font-size:18px">' + gradeText + '</h2>' +
-      '<p style="color:var(--gray-500);font-size:13px;margin-bottom:12px">答对 ' + correct + ' / ' + total + ' 题</p>' +
+      '<p style="color:var(--gray-500);font-size:13px;margin-bottom:12px">已答 ' + attempted + ' 题 · 答对 ' + correct + ' 题 · 共 ' + total + ' 题</p>' +
       '<div class="detail">' +
         '<div class="stat correct"><div class="num">' + correct + '</div><div class="lbl">正确</div></div>' +
         '<div class="stat wrong"><div class="num">' + wrong + '</div><div class="lbl">错误</div></div>' +
         (unanswered > 0 ? '<div class="stat"><div class="num" style="color:var(--gray-400)">' + unanswered + '</div><div class="lbl">未答</div></div>' : '') +
-        '<div class="stat"><div class="num">' + questions.length + '</div><div class="lbl">总题数</div></div>' +
+        '<div class="stat"><div class="num">' + total + '</div><div class="lbl">总题数</div></div>' +
       '</div>' +
       '<div>' +
         '<button onclick="renderQuizSetup()">返回练习设置</button>' +
@@ -497,6 +554,8 @@ function retryWrongQuiz() {
   quizState.questions = wrong;
   quizState.currentIdx = 0;
   quizState.submitted = [];
+  clearQuizResume();
+  saveQuizResume();
 
   document.getElementById('quiz-result-area').style.display = 'none';
   document.getElementById('quiz-playing').style.display = 'block';
@@ -544,3 +603,88 @@ function saveQuizNote(qId) {
   if (editor) editor.style.display = 'none';
   toast(note ? '备注已保存' : '备注已删除', 'success');
 }
+
+// ============================================================
+// QUIZ AUTO-SAVE & RESUME
+// ============================================================
+var _pendingResumeData = null;
+
+function saveQuizResume() {
+  if (!quizState.started || !quizState.questions.length) return;
+  var data = {
+    questions: quizState.questions,
+    currentIdx: quizState.currentIdx,
+    submitted: quizState.submitted,
+    mode: quizState.mode,
+    savedAt: Date.now()
+  };
+  try {
+    localStorage.setItem('quiz_resume', JSON.stringify(data));
+  } catch (e) {}
+}
+
+function clearQuizResume() {
+  localStorage.removeItem('quiz_resume');
+  _pendingResumeData = null;
+}
+
+function checkQuizResume() {
+  try {
+    var raw = localStorage.getItem('quiz_resume');
+    if (!raw) return;
+    var data = JSON.parse(raw);
+    if (!data || !data.questions || !data.questions.length) { clearQuizResume(); return; }
+    var hasProgress = data.submitted && data.submitted.some(function (s) { return s.attempts > 0 || s.userAnswer; });
+    if (!hasProgress && data.currentIdx === 0) { clearQuizResume(); return; }
+    _pendingResumeData = data;
+    var answered = data.submitted ? data.submitted.filter(function (s) { return s.attempts > 0; }).length : 0;
+    document.getElementById('resume-info').textContent =
+      '您有未完成的答题：共 ' + data.questions.length + ' 题，已答 ' + answered + ' 题，当前第 ' + (data.currentIdx + 1) + ' 题。是否继续？';
+    document.getElementById('modal-quiz-resume').classList.add('active');
+  } catch (e) { clearQuizResume(); }
+}
+
+function dismissQuizResume() {
+  document.getElementById('modal-quiz-resume').classList.remove('active');
+  clearQuizResume();
+}
+
+function resumeQuiz() {
+  document.getElementById('modal-quiz-resume').classList.remove('active');
+  var data = _pendingResumeData;
+  _pendingResumeData = null;
+  if (!data) return;
+
+  quizState.mode = data.mode || 'sequential';
+  quizState.questions = data.questions;
+  quizState.currentIdx = data.currentIdx;
+  quizState.submitted = data.submitted;
+  quizState.started = true;
+
+  document.getElementById('quiz-setup').style.display = 'none';
+  document.getElementById('quiz-playing').style.display = 'block';
+  document.getElementById('quiz-result-area').style.display = 'none';
+
+  document.querySelectorAll('.tab-btn').forEach(function (b) { b.classList.toggle('active', b.dataset.tab === 'quiz'); });
+  document.querySelectorAll('.view').forEach(function (v) { v.classList.remove('active'); });
+  document.getElementById('view-quiz').classList.add('active');
+
+  renderQuizQuestion();
+  toast('已恢复答题进度', 'info');
+}
+
+// Save on page unload to catch in-progress text inputs
+window.addEventListener('beforeunload', function () {
+  if (!quizState.started) return;
+  var q = quizState.questions[quizState.currentIdx];
+  if (q && (q.type === 'fill' || q.type === 'short')) {
+    var input = document.querySelector('.quiz-fill-input, .quiz-short-input');
+    if (input) {
+      var val = input.value;
+      var existing = quizState.submitted.find(function (s) { return s.qId === q.id && s.attempts === 0; });
+      if (existing) { existing.userAnswer = val; }
+      else if (val) { quizState.submitted.push({ qId: q.id, userAnswer: val, correct: false, attempts: 0 }); }
+    }
+  }
+  saveQuizResume();
+});

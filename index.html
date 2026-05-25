@@ -118,6 +118,12 @@
               <div class="bar-wrap"><div class="bar-fill" id="quiz-bar" style="width:0%"></div></div>
               <div class="info" id="quiz-progress-info">0/0</div>
             </div>
+            <div class="quiz-num-header" id="quiz-num-header" onclick="toggleQuizNumGrid()">
+              <span>📋 题号导航</span>
+              <span id="quiz-num-summary" style="font-size:11px;color:var(--gray-400)"></span>
+              <span id="quiz-num-toggle" style="margin-left:auto;font-size:12px;color:var(--gray-400);cursor:pointer">▲</span>
+            </div>
+            <div class="quiz-num-grid" id="quiz-num-grid"></div>
             <div id="quiz-question-card"></div>
             <div id="quiz-nav-bar" class="quiz-nav"></div>
           </div>
@@ -289,6 +295,18 @@
     <div class="modal-actions">
       <button class="btn-cancel" onclick="hideModal('notes')">取消</button>
       <button class="btn-confirm" onclick="saveNotes()">保存备注</button>
+    </div>
+  </div>
+</div>
+
+<!-- Quiz Resume Modal -->
+<div class="modal-overlay" id="modal-quiz-resume">
+  <div class="modal" style="max-width:420px;text-align:center">
+    <h3>📝 发现未完成的答题</h3>
+    <p style="font-size:13px;color:var(--gray-500);margin:12px 0" id="resume-info"></p>
+    <div class="modal-actions" style="justify-content:center">
+      <button class="btn-cancel" onclick="dismissQuizResume()">放弃进度</button>
+      <button class="btn-confirm" onclick="resumeQuiz()">继续答题</button>
     </div>
   </div>
 </div>

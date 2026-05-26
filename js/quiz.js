@@ -351,7 +351,8 @@ function renderQuizQuestion() {
   var canNext = currentIdx < questions.length - 1;
   var submitBtn = '';
   if (!isSubmitted) {
-    submitBtn = '<button class="btn-submit" onclick="submitQuizAnswer()" id="quiz-submit-btn">提交答案</button>';
+    submitBtn = '<button class="btn-submit" onclick="submitQuizAnswer()" id="quiz-submit-btn">提交答案</button>' +
+      '<button class="btn-dunno" onclick="submitDunno()">不知道</button>';
   }
 
   nav.innerHTML =
@@ -447,6 +448,23 @@ function submitQuizAnswer() {
   else { q.stats.wrong++; sub.correct = false; }
 
   sub.attempts++;
+  saveData();
+  saveQuizResume();
+  renderSidebar();
+  renderQuizQuestion();
+}
+
+function submitDunno() {
+  var q = quizState.questions[quizState.currentIdx];
+  if (!q) return;
+  // Remove any existing unsubmitted answer
+  var idx = quizState.submitted.findIndex(function (s) { return s.qId === q.id && s.attempts === 0; });
+  if (idx >= 0) quizState.submitted.splice(idx, 1);
+  // Submit as wrong with empty answer
+  quizState.submitted.push({ qId: q.id, userAnswer: '', correct: false, attempts: 1 });
+  if (!q.stats) q.stats = { attempts: 0, correct: 0, wrong: 0 };
+  q.stats.attempts++;
+  q.stats.wrong++;
   saveData();
   saveQuizResume();
   renderSidebar();

@@ -226,6 +226,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto
 .quiz-nav button:disabled { opacity: .5; cursor: not-allowed; }
 .quiz-nav .btn-submit { background: var(--primary); color: #fff; }
 .quiz-nav .btn-submit:hover:not(:disabled) { background: var(--primary-dark); }
+.quiz-nav .btn-dunno { background: #fff; color: var(--gray-500); border: 1px solid var(--gray-300); }
+.quiz-nav .btn-dunno:hover { border-color: var(--gray-400); color: var(--gray-700); }
 .quiz-nav .btn-next { background: var(--success); color: #fff; }
 .quiz-nav .btn-next:hover:not(:disabled) { opacity: .9; }
 .quiz-nav .btn-prev { background: var(--gray-100); color: var(--gray-600); }

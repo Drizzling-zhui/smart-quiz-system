@@ -54,6 +54,7 @@ function openChat() {
   if (currentNodeId) setChatContext();
   ensureWelcomeMessage();
   renderChatMessages();
+  document.getElementById('chat-messages').scrollTop = document.getElementById('chat-messages').scrollHeight;
 }
 
 function ensureWelcomeMessage() {
@@ -201,6 +202,7 @@ function sendChatMessage(text) {
   chatState.messages.push({ role: 'user', content: text });
   document.getElementById('chat-input').value = '';
   renderChatMessages();
+  document.getElementById('chat-messages').scrollTop = document.getElementById('chat-messages').scrollHeight;
 
   var cfg = getApiConfig();
   var msgs = [{ role: 'system', content: '你是一个专业的题目讲解助手。请用简洁清晰的中文回答，帮助学生理解题目涉及的知识点。回答时可以使用 Markdown 格式来排版（标题、列表、加粗、代码块等），让回答结构清晰易读。' }];
@@ -299,8 +301,14 @@ function readStream(response) {
   read();
 }
 
+function isChatAtBottom() {
+  var container = document.getElementById('chat-messages');
+  return container.scrollHeight - container.scrollTop - container.clientHeight < 50;
+}
+
 function updateStreamingContent(content) {
   var container = document.getElementById('chat-messages');
+  var wasAtBottom = isChatAtBottom();
   // Remove the loading dots placeholder
   var loadingEl = container.querySelector('.chat-msg.loading');
   if (loadingEl) loadingEl.remove();
@@ -317,7 +325,9 @@ function updateStreamingContent(content) {
     html = '<details class="reasoning-block" open><summary>💭 思考过程</summary>' + renderMD(window._chatReasoning) + '</details>' + html;
   }
   streamEl.innerHTML = html;
-  container.scrollTop = container.scrollHeight;
+  if (wasAtBottom) {
+    container.scrollTop = container.scrollHeight;
+  }
 }
 
 function renderChatMessages() {
@@ -331,7 +341,6 @@ function renderChatMessages() {
     html += '<div class="chat-msg assistant loading"><span class="loading-dots">思考中<span>.</span><span>.</span><span>.</span></span></div>';
   }
   container.innerHTML = html;
-  container.scrollTop = container.scrollHeight;
 }
 
 function clearChat() {

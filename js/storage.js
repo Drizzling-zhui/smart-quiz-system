@@ -5,6 +5,16 @@ var localDirHandle = null;
 var localSyncEnabled = false;
 var localDirName = '';
 
+var LOCAL_DIR_NAME_KEY = 'quiz_app_dir_name';
+
+// Restore dir name from localStorage (survives even if IndexedDB handle loses permission)
+(function () {
+  try {
+    var saved = localStorage.getItem(LOCAL_DIR_NAME_KEY);
+    if (saved) localDirName = saved;
+  } catch (e) {}
+})();
+
 // IndexedDB for persisting directory handle across page reloads
 function _openFSDB() {
   return new Promise(function (resolve, reject) {
@@ -40,7 +50,6 @@ function _setStoredHandle(handle) {
 // Init: try to restore saved directory handle
 function initFileSync() {
   if (!window.showDirectoryPicker) {
-    // File System Access API not available
     updateSyncIndicator();
     return;
   }
@@ -51,6 +60,7 @@ function initFileSync() {
         localDirHandle = handle;
         localSyncEnabled = true;
         localDirName = handle.name;
+        try { localStorage.setItem(LOCAL_DIR_NAME_KEY, handle.name); } catch (e) {}
         updateSyncIndicator();
         updateDirDisplay();
         checkLocalData();
@@ -60,33 +70,78 @@ function initFileSync() {
             localDirHandle = handle;
             localSyncEnabled = true;
             localDirName = handle.name;
+            try { localStorage.setItem(LOCAL_DIR_NAME_KEY, handle.name); } catch (e) {}
             updateSyncIndicator();
             updateDirDisplay();
             checkLocalData();
           } else {
+            // Permission denied by user
             updateSyncIndicator();
             updateDirDisplay();
           }
+        }).catch(function () {
+          // requestPermission failed (likely no user gesture on page load)
+          // Keep dir name from localStorage so UI shows it was previously bound
+          updateSyncIndicator();
+          updateDirDisplay();
         });
       }
     });
   }).catch(function () { updateSyncIndicator(); });
 }
 
-// Pick data directory (user-initiated)
+// Pick data directory (user-initiated, has user gesture)
 function pickDataDirectory() {
   if (!window.showDirectoryPicker) {
     return toast('当前浏览器不支持本地文件访问，请使用 Chrome 或 Edge', 'warning');
   }
-  window.showDirectoryPicker({ mode: 'readwrite' }).then(function (handle) {
-    localDirHandle = handle;
-    localSyncEnabled = true;
-    localDirName = handle.name;
-    _setStoredHandle(handle).then(function () {
-      updateSyncIndicator();
-      updateDirDisplay();
-      toast('已绑定本地文件夹，数据将自动同步', 'success');
-      backupToFile();
+  // First, try to re-authorize an existing stored handle (user gesture available now)
+  _getStoredHandle().then(function (storedHandle) {
+    if (storedHandle) {
+      return storedHandle.queryPermission({ mode: 'readwrite' }).then(function (state) {
+        if (state === 'granted') {
+          // Already authorized, just restore
+          localDirHandle = storedHandle;
+          localSyncEnabled = true;
+          localDirName = storedHandle.name;
+          try { localStorage.setItem(LOCAL_DIR_NAME_KEY, storedHandle.name); } catch (e) {}
+          updateSyncIndicator();
+          updateDirDisplay();
+          toast('已恢复本地文件夹绑定', 'success');
+          backupToFile();
+          return 'restored';
+        }
+        return storedHandle.requestPermission({ mode: 'readwrite' }).then(function (newState) {
+          if (newState === 'granted') {
+            localDirHandle = storedHandle;
+            localSyncEnabled = true;
+            localDirName = storedHandle.name;
+            try { localStorage.setItem(LOCAL_DIR_NAME_KEY, storedHandle.name); } catch (e) {}
+            updateSyncIndicator();
+            updateDirDisplay();
+            toast('已恢复本地文件夹绑定', 'success');
+            backupToFile();
+            return 'restored';
+          }
+          return 'denied';
+        }).catch(function () { return 'denied'; });
+      });
+    }
+    return 'no-handle';
+  }).then(function (result) {
+    if (result === 'restored') return;
+    // Need to pick a new directory
+    return window.showDirectoryPicker({ mode: 'readwrite' }).then(function (handle) {
+      localDirHandle = handle;
+      localSyncEnabled = true;
+      localDirName = handle.name;
+      try { localStorage.setItem(LOCAL_DIR_NAME_KEY, handle.name); } catch (e) {}
+      return _setStoredHandle(handle).then(function () {
+        updateSyncIndicator();
+        updateDirDisplay();
+        toast('已绑定本地文件夹，数据将自动同步', 'success');
+        backupToFile();
+      });
     });
   }).catch(function (e) {
     if (e.name !== 'AbortError') toast('绑定失败：' + e.message, 'error');
@@ -98,6 +153,7 @@ function releaseDataDirectory() {
   localDirHandle = null;
   localSyncEnabled = false;
   localDirName = '';
+  try { localStorage.removeItem(LOCAL_DIR_NAME_KEY); } catch (e) {}
   _setStoredHandle(null).then(function () {
     updateSyncIndicator();
     updateDirDisplay();
@@ -284,6 +340,8 @@ function updateSyncIndicator() {
   if (!el) return;
   if (localSyncEnabled) {
     el.innerHTML = '<span style="color:var(--success);font-size:11px">🟢 已同步到本地</span>';
+  } else if (localDirName) {
+    el.innerHTML = '<span style="color:var(--warning, #e6a817);font-size:11px">⚠️ 点击重新授权目录</span>';
   } else if (window.showDirectoryPicker) {
     el.innerHTML = '<span style="color:var(--gray-400);font-size:11px">📁 未绑定目录</span>';
   } else {
@@ -304,6 +362,12 @@ function updateDirDisplay() {
     if (bindBtn) bindBtn.textContent = '更改目录';
     if (unbindBtn) unbindBtn.style.display = '';
     if (syncBtn) syncBtn.style.display = '';
+  } else if (localDirName) {
+    pathText.textContent = '…\\' + localDirName + ' (需重新授权)';
+    pathText.style.color = 'var(--warning, #e6a817)';
+    if (bindBtn) bindBtn.textContent = '重新授权';
+    if (unbindBtn) unbindBtn.style.display = '';
+    if (syncBtn) syncBtn.style.display = 'none';
   } else {
     pathText.textContent = '未绑定';
     pathText.style.color = 'var(--gray-400)';

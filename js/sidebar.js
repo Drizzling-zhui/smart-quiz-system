@@ -12,10 +12,26 @@ function renderSidebar() {
     var root = getRootNode(s);
     if (!root) return;
     if (idx > 0) html += '<div class="subject-divider"></div>';
-    html += '<div class="subject-label">' + escHtml(s.name) + '</div>';
-    html += renderTreeNode(root, s, 0);
+    var collapsed = s.collapsed === true;
+    var totalQ = countQuestionsInNode(root.id);
+    html += '<div class="subject-label' + (collapsed ? ' collapsed' : '') + '" onclick="toggleSubjectCollapseIdx(' + idx + ')">' +
+      '<span class="subject-arrow">' + (collapsed ? '▶' : '▼') + '</span> ' +
+      escHtml(s.name) +
+      '<span class="tree-count">' + totalQ + '题</span>' +
+    '</div>';
+    if (!collapsed) {
+      html += renderTreeNode(root, s, 0);
+    }
   });
   c.innerHTML = html;
+}
+
+function toggleSubjectCollapseIdx(idx) {
+  var s = appData.subjects[idx];
+  if (!s) return;
+  s.collapsed = s.collapsed === true ? false : true;
+  saveData();
+  renderSidebar();
 }
 
 function renderTreeNode(node, subject, depth) {

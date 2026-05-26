@@ -9,7 +9,7 @@
 <body>
 
 <div id="app">
-  <!-- Sidebar -->
+  <!-- Sidebar Drawer -->
   <aside id="sidebar">
     <div class="sidebar-header">
       <h1><span>📚</span> 智能题库</h1>
@@ -25,9 +25,13 @@
       <button onclick="promptNewSubject()">＋ 添加学科</button>
     </div>
   </aside>
+  <div id="sidebar-backdrop" onclick="closeSidebar()"></div>
 
   <div id="main">
     <div id="topbar">
+      <button id="btn-menu" onclick="toggleSidebar()" title="菜单" aria-label="菜单">
+        <span class="hamburger-line"></span>
+      </button>
       <button class="tab-btn active" data-tab="browse" onclick="switchTab('browse')">📖 浏览题库</button>
       <button class="tab-btn" data-tab="quiz" onclick="switchTab('quiz')">✏️ 答题模式</button>
     </div>

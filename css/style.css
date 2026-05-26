@@ -20,10 +20,30 @@
 }
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans SC", sans-serif; background: var(--gray-50); color: var(--gray-800); height: 100vh; overflow: hidden; }
-#app { display: flex; height: 100vh; }
+#app { display: flex; height: 100vh; position: relative; }
 
-/* ===== Sidebar ===== */
-#sidebar { width: 250px; min-width: 250px; background: #fff; border-right: 1px solid var(--gray-200); display: flex; flex-direction: column; }
+/* ===== Sidebar Drawer ===== */
+#sidebar { width: 280px; min-width: 280px; background: #fff; border-right: 1px solid var(--gray-200); display: flex; flex-direction: column; position: fixed; top: 0; left: 0; bottom: 0; z-index: 100; transform: translateX(-100%); transition: transform .25s cubic-bezier(.4,0,.2,1); box-shadow: 2px 0 12px rgba(0,0,0,.08); }
+#sidebar.open { transform: translateX(0); }
+#sidebar.open + #sidebar-backdrop { display: block; }
+
+#sidebar-backdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.3); z-index: 99; }
+
+/* Hamburger button */
+#btn-menu { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border: none; background: none; cursor: pointer; font-size: 20px; color: var(--gray-600); border-radius: 6px; margin-right: 8px; flex-shrink: 0; }
+#btn-menu:hover { background: var(--gray-100); }
+.hamburger-line { display: block; width: 18px; height: 2px; background: var(--gray-600); border-radius: 2px; position: relative; transition: all .2s; }
+.hamburger-line::before, .hamburger-line::after { content: ''; display: block; width: 18px; height: 2px; background: var(--gray-600); border-radius: 2px; position: absolute; left: 0; transition: all .2s; }
+.hamburger-line::before { top: -5px; }
+.hamburger-line::after { top: 5px; }
+
+/* Desktop: sidebar always visible, no backdrop */
+@media (min-width: 769px) {
+  #sidebar { position: relative; transform: none; box-shadow: none; z-index: auto; }
+  #sidebar + #sidebar-backdrop { display: none !important; }
+  #btn-menu { display: none; }
+  #main { margin-left: 0; }
+}
 .sidebar-header { padding: 16px 18px; border-bottom: 1px solid var(--gray-200); }
 .sidebar-header h1 { font-size: 17px; color: var(--primary); display: flex; align-items: center; gap: 8px; }
 .sidebar-header h1 span { font-size: 20px; }
@@ -423,7 +443,7 @@ body.resizing .chat-resize-handle { background: rgba(79,110,247,.25); }
 .chat-msg.streaming { border-left: 2px solid var(--primary); animation: streamPulse 1.5s ease-in-out infinite; }
 @keyframes streamPulse { 0%,100% { border-left-color: var(--primary); } 50% { border-left-color: var(--primary-light); } }
 
-@media (max-width: 768px) { #sidebar { width: 180px; min-width: 180px; } #content { padding: 12px; } #chat-panel.open { width: 260px !important; } }
+@media (max-width: 768px) { #sidebar { width: 280px; min-width: 280px; } #content { padding: 12px; } #chat-panel.open { width: 260px !important; } }
 
 /* Quiz type selector in setup */
 .qtype-checks { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }

@@ -475,9 +475,10 @@
         <span id="lan-status-text">服务器未连接</span>
       </div>
 
-      <div class="lan-sync-actions">
-        <button onclick="lanStartReceive()" id="btn-lan-receive" style="padding:7px 14px;background:var(--primary);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px">📥 启动接收</button>
-        <button onclick="lanSendToPhone()" id="btn-lan-send" style="padding:7px 14px;background:#fff;color:var(--gray-600);border:1px solid var(--gray-300);border-radius:6px;cursor:pointer;font-size:13px">📤 发送到手机</button>
+      <div class="lan-sync-actions" id="lan-sync-actions">
+        <button onclick="lanLaunchServer()" id="btn-lan-launch" style="padding:7px 14px;background:var(--success);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px">▶ 启动服务</button>
+        <button onclick="lanStartReceive()" id="btn-lan-receive" style="padding:7px 14px;background:var(--primary);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;display:none">📥 启动接收</button>
+        <button onclick="lanSendToPhone()" id="btn-lan-send" style="padding:7px 14px;background:#fff;color:var(--gray-600);border:1px solid var(--gray-300);border-radius:6px;cursor:pointer;font-size:13px;display:none">📤 发送到手机</button>
         <button onclick="lanStopServer()" id="btn-lan-stop" style="padding:7px 14px;background:var(--danger);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;display:none">⏹ 停止</button>
       </div>
 

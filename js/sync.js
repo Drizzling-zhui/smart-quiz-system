@@ -279,13 +279,58 @@ function lanCheckServer() {
   }).then(function (data) {
     _lanServerAddr = data.ip + ':' + data.port;
     _lanUpdateStatus('🟢', '服务器已连接 (' + _lanServerAddr + ')', true);
-    document.getElementById('btn-lan-stop').style.display = '';
+    document.getElementById('btn-lan-launch').style.display = 'none';
+    document.getElementById('btn-lan-receive').style.display = '';
+    document.getElementById('btn-lan-send').style.display = '';
     return data;
   }).catch(function () {
     _lanUpdateStatus('⚪', '服务器未连接', false);
-    document.getElementById('btn-lan-stop').style.display = 'none';
+    document.getElementById('btn-lan-launch').style.display = '';
+    document.getElementById('btn-lan-receive').style.display = 'none';
+    document.getElementById('btn-lan-send').style.display = 'none';
     return null;
   });
+}
+
+// Launch the Python sync server via batch file
+function lanLaunchServer() {
+  var launchBtn = document.getElementById('btn-lan-launch');
+  launchBtn.textContent = '⏳ 启动中...';
+  launchBtn.disabled = true;
+  // Trigger download/open of the batch file
+  var a = document.createElement('a');
+  a.href = 'sync_server.bat';
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+
+  _lanUpdateStatus('🟡', '等待服务器启动...', false);
+  // Poll for server to come online
+  var attempts = 0;
+  var poll = setInterval(function () {
+    attempts++;
+    fetch('http://127.0.0.1:8081/ping').then(function (r) {
+      return r.json();
+    }).then(function (data) {
+      clearInterval(poll);
+      _lanServerAddr = data.ip + ':' + data.port;
+      _lanUpdateStatus('🟢', '服务器已连接 (' + _lanServerAddr + ')', true);
+      document.getElementById('btn-lan-launch').style.display = 'none';
+      document.getElementById('btn-lan-receive').style.display = '';
+      document.getElementById('btn-lan-send').style.display = '';
+      launchBtn.textContent = '▶ 启动服务';
+      launchBtn.disabled = false;
+      toast('服务器已启动', 'success');
+    }).catch(function () {
+      if (attempts >= 20) {
+        clearInterval(poll);
+        _lanUpdateStatus('⚪', '服务器启动超时，请手动双击 sync_server.bat', false);
+        launchBtn.textContent = '▶ 启动服务';
+        launchBtn.disabled = false;
+      }
+    });
+  }, 500);
 }
 
 // PC: Start receive mode - poll for incoming data

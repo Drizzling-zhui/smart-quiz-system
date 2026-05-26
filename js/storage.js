@@ -179,6 +179,11 @@ function _getFileHandle(dirHandle, pathParts) {
 // Write appData to local data/subjects/ folder (tree structure + full backup)
 function backupToFile() {
   if (!localDirHandle || !localSyncEnabled) return;
+  // Safety: never overwrite local data with empty subjects
+  if (!appData || !appData.subjects || !appData.subjects.length) {
+    console.warn('backupToFile: appData is empty, skipping to prevent data loss');
+    return;
+  }
   var dirHandle = localDirHandle;
   dirHandle.queryPermission({ mode: 'readwrite' }).then(function (state) {
     if (state !== 'granted') {
@@ -326,7 +331,10 @@ function showDataSyncBanner(fileData) {
 }
 
 function mergeLocalData(fileData) {
-  if (!fileData || !fileData.subjects) return;
+  if (!fileData || !fileData.subjects || !fileData.subjects.length) {
+    toast('本地数据文件为空，已跳过同步', 'warning');
+    return;
+  }
   appData = fileData;
   saveData();
   renderSidebar();

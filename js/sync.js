@@ -47,10 +47,19 @@ function encryptQuizData(password) {
   password = password.trim();
   if (password.length < 4) return Promise.reject(new Error('口令至少4位'));
 
+  // Bundle full profile: appData + apiConfig + favorites
+  var bundle = {
+    appData: appData,
+    apiConfig: typeof getApiConfig === 'function' ? getApiConfig() : null,
+    favorites: typeof favorites !== 'undefined' ? favorites : [],
+    version: '2.0',
+    exportedAt: new Date().toISOString()
+  };
+
   var salt = crypto.getRandomValues(new Uint8Array(SYNC_SALT_LEN));
   var iv = crypto.getRandomValues(new Uint8Array(SYNC_IV_LEN));
   var enc = new TextEncoder();
-  var plaintext = enc.encode(JSON.stringify(appData));
+  var plaintext = enc.encode(JSON.stringify(bundle));
 
   return _syncDeriveKey(password, salt).then(function (key) {
     return crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, key, plaintext);
@@ -112,9 +121,12 @@ function exportEncrypted() {
   statusEl.textContent = '⏳ 正在加密...';
   statusEl.style.color = 'var(--gray-500)';
 
-  var totalQuestions = appData.subjects.reduce(function (s, sub) {
-    return s + (sub.questions ? sub.questions.length : 0);
-  }, 0);
+  var totalQuestions = 0;
+  (appData.subjects || []).forEach(function (s) {
+    (s.nodes || []).forEach(function (n) {
+      if (n.type === 'file' && n.questions) totalQuestions += n.questions.length;
+    });
+  });
 
   encryptQuizData(password).then(function (b64) {
     var blob = new Blob([b64], { type: 'application/octet-stream' });
@@ -125,9 +137,10 @@ function exportEncrypted() {
     a.click();
     URL.revokeObjectURL(url);
 
-    statusEl.textContent = '✅ 导出成功！' + appData.subjects.length + '个学科，' + totalQuestions + '道题';
+    var hasApi = !!(getApiConfig().key);
+    statusEl.textContent = '✅ 导出成功！' + appData.subjects.length + '个学科，' + totalQuestions + '道题' + (hasApi ? '，含API配置' : '');
     statusEl.style.color = 'var(--success)';
-    toast('加密导出成功', 'success');
+    toast('加密导出成功（含题库数据' + (hasApi ? '、API配置' : '') + '、收藏）', 'success');
   }).catch(function (e) {
     statusEl.textContent = '❌ 加密失败：' + e.message;
     statusEl.style.color = 'var(--danger)';
@@ -147,30 +160,68 @@ function importEncrypted(file) {
 
   var reader = new FileReader();
   reader.onload = function () {
-    decryptQuizData(reader.result, password).then(function (data) {
+    decryptQuizData(reader.result, password).then(function (raw) {
+      var extraInfo = [];
+      // Detect new bundle format vs old format
+      var data, bundle;
+      if (raw.appData) {
+        // New bundle format: { appData, apiConfig, favorites, ... }
+        bundle = raw;
+        data = raw.appData;
+        extraInfo.push('全量配置');
+      } else {
+        // Old format: raw is the appData directly
+        data = raw;
+      }
+
       if (!data.subjects || !Array.isArray(data.subjects)) {
         throw new Error('数据格式不正确，缺少学科数据');
       }
+
       // Validate and normalize imported data
       appData = data;
-      if (!appData.version) appData.version = '1.0';
+      if (!appData.version) appData.version = '2.0';
       appData.subjects.forEach(function (sub) {
-        if (!sub.questions) sub.questions = [];
-        sub.questions.forEach(function (q) {
-          if (!q.id) q.id = Date.now() + Math.floor(Math.random() * 10000);
-          if (!q.stats) q.stats = { attempts: 0, correct: 0, wrong: 0 };
-          if (!q.explanation) q.explanation = '';
-          if (!q.options) q.options = [];
+        if (!sub.nodes) sub.nodes = [];
+        sub.nodes.forEach(function (n) {
+          if (n.type === 'file' && n.questions) {
+            n.questions.forEach(function (q) {
+              if (!q.id) q.id = Date.now() + Math.floor(Math.random() * 10000);
+              if (!q.stats) q.stats = { attempts: 0, correct: 0, wrong: 0 };
+              if (!q.explanation) q.explanation = '';
+              if (!q.options) q.options = [];
+            });
+          }
         });
       });
       saveData();
+
+      // Restore API config if present in bundle
+      if (bundle && bundle.apiConfig && bundle.apiConfig.endpoint) {
+        try { localStorage.setItem('quiz_app_api_config', JSON.stringify(bundle.apiConfig)); } catch (e) {}
+        extraInfo.push('API配置');
+      }
+
+      // Restore favorites if present in bundle
+      if (bundle && Array.isArray(bundle.favorites)) {
+        favorites = bundle.favorites;
+        saveFavorites();
+        extraInfo.push('收藏');
+      }
+
       renderSidebar();
       renderBrowse();
-      var totalQ = appData.subjects.reduce(function (s, sub) { return s + sub.questions.length; }, 0);
-      statusEl.textContent = '✅ 导入成功！' + appData.subjects.length + '个学科，' + totalQ + '道题';
+
+      var totalQ = 0;
+      (appData.subjects || []).forEach(function (s) {
+        (s.nodes || []).forEach(function (n) {
+          if (n.type === 'file' && n.questions) totalQ += n.questions.length;
+        });
+      });
+      statusEl.textContent = '✅ 导入成功！' + appData.subjects.length + '个学科，' + totalQ + '道题' + (extraInfo.length ? '（' + extraInfo.join('、') + '已恢复）' : '');
       statusEl.style.color = 'var(--success)';
       document.getElementById('sync-import-file').value = '';
-      toast('题库导入成功', 'success');
+      toast('导入成功：' + extraInfo.join('、') + '已恢复', 'success');
     }).catch(function (e) {
       statusEl.textContent = '❌ ' + e.message;
       statusEl.style.color = 'var(--danger)';
@@ -194,3 +245,194 @@ hideModal = function (type) {
   }
   _origHideSettings(type);
 };
+
+// ============================================================
+// LAN SYNC (PC server: sync_server.py)
+// ============================================================
+var _lanPollTimer = null;
+var _lanServerAddr = '';
+
+function _lanServerURL() {
+  return 'http://' + (_lanServerAddr || '127.0.0.1:8081');
+}
+
+function _lanGenQR(text) {
+  var encoded = encodeURIComponent(text);
+  return 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encoded;
+}
+
+function _lanUpdateStatus(icon, text, connected) {
+  var iconEl = document.getElementById('lan-status-icon');
+  var textEl = document.getElementById('lan-status-text');
+  if (iconEl) iconEl.textContent = icon;
+  if (textEl) textEl.textContent = text;
+  var statusEl = document.getElementById('lan-sync-status');
+  if (statusEl) {
+    statusEl.classList.toggle('connected', !!connected);
+  }
+}
+
+// Ping the local sync server
+function lanCheckServer() {
+  return fetch(_lanServerURL() + '/ping').then(function (r) {
+    return r.json();
+  }).then(function (data) {
+    _lanServerAddr = data.ip + ':' + data.port;
+    _lanUpdateStatus('🟢', '服务器已连接 (' + _lanServerAddr + ')', true);
+    document.getElementById('btn-lan-stop').style.display = '';
+    return data;
+  }).catch(function () {
+    _lanUpdateStatus('⚪', '服务器未连接', false);
+    document.getElementById('btn-lan-stop').style.display = 'none';
+    return null;
+  });
+}
+
+// PC: Start receive mode - poll for incoming data
+function lanStartReceive() {
+  lanCheckServer().then(function (data) {
+    if (!data) {
+      return toast('请先在命令行启动 sync_server.py', 'warning');
+    }
+    // Show QR code for phone to push
+    var url = 'http://' + _lanServerAddr;
+    document.getElementById('lan-url-text').textContent = url + '/push';
+    document.getElementById('lan-qr-img').src = _lanGenQR(url + '/push');
+    document.getElementById('lan-qr-hint').textContent = '手机扫码后点「推送到电脑」';
+    document.getElementById('lan-qr-area').style.display = '';
+    document.getElementById('btn-lan-receive').style.display = 'none';
+    document.getElementById('btn-lan-send').style.display = 'none';
+    document.getElementById('btn-lan-stop').style.display = '';
+
+    _lanUpdateStatus('🔵', '等待手机推送... (' + _lanServerAddr + ')', true);
+    toast('已启动接收，等待手机推送', 'info');
+
+    // Start polling for incoming data
+    _lanPollTimer = setInterval(function () {
+      fetch(_lanServerURL() + '/check-incoming').then(function (r) {
+        return r.json();
+      }).then(function (res) {
+        if (res && res.hasData) {
+          clearInterval(_lanPollTimer);
+          _lanPollTimer = null;
+          // Fetch the incoming data
+          return fetch(_lanServerURL() + '/pull').then(function (r) {
+            if (!r.ok) throw new Error('no data');
+            return r.text();
+          }).then(function (encData) {
+            // Clear the incoming flag
+            fetch(_lanServerURL() + '/clear-incoming', { method: 'POST' });
+            // Import the data
+            var blob = new Blob([encData], { type: 'text/plain' });
+            var file = new File([blob], 'lan_sync.enc', { type: 'text/plain' });
+            importEncrypted(file);
+            lanStopServer();
+            toast('已从手机接收并导入数据', 'success');
+          });
+        }
+      });
+    }, 2000);
+  });
+}
+
+// PC: Send data to phone - upload to server for phone to pull
+function lanSendToPhone() {
+  if (!appData || !appData.subjects || !appData.subjects.length) {
+    return toast('没有可发送的题库数据', 'warning');
+  }
+  lanCheckServer().then(function (data) {
+    if (!data) {
+      return toast('请先在命令行启动 sync_server.py', 'warning');
+    }
+    var password = document.getElementById('sync-password').value;
+    if (!password || password.length < 4) {
+      return toast('请先在数据同步区域设置口令（至少4位）', 'warning');
+    }
+    encryptQuizData(password).then(function (b64) {
+      return fetch(_lanServerURL() + '/upload-outgoing', {
+        method: 'POST',
+        body: b64
+      });
+    }).then(function () {
+      var url = 'http://' + _lanServerAddr + '/pull';
+      document.getElementById('lan-url-text').textContent = url;
+      document.getElementById('lan-qr-img').src = _lanGenQR(url);
+      document.getElementById('lan-qr-hint').textContent = '手机扫码后点「从电脑拉取」，口令与电脑端相同';
+      document.getElementById('lan-qr-area').style.display = '';
+      document.getElementById('btn-lan-receive').style.display = 'none';
+      document.getElementById('btn-lan-send').style.display = 'none';
+      document.getElementById('btn-lan-stop').style.display = '';
+      _lanUpdateStatus('🟢', '数据已就绪，等待手机拉取', true);
+      toast('数据已准备，请用手机扫码拉取', 'success');
+    }).catch(function (e) {
+      toast('发送失败：' + (e.message || '未知错误'), 'error');
+    });
+  });
+}
+
+// PC: Stop LAN server mode
+function lanStopServer() {
+  if (_lanPollTimer) { clearInterval(_lanPollTimer); _lanPollTimer = null; }
+  document.getElementById('lan-qr-area').style.display = 'none';
+  document.getElementById('btn-lan-receive').style.display = '';
+  document.getElementById('btn-lan-send').style.display = '';
+  document.getElementById('btn-lan-stop').style.display = 'none';
+  _lanUpdateStatus('⚪', '已停止');
+  // Clear server state
+  fetch(_lanServerURL() + '/clear-incoming', { method: 'POST' }).catch(function () {});
+}
+
+// Phone: Pull data from PC
+function lanPullFromPC() {
+  var addr = document.getElementById('lan-pc-address').value.trim();
+  if (!addr) return toast('请输入电脑IP地址', 'warning');
+  if (addr.indexOf(':') === -1) addr += ':8081';
+  var base = 'http://' + addr;
+  var statusEl = document.getElementById('sync-status');
+  statusEl.textContent = '⏳ 正在从电脑拉取...';
+  statusEl.style.color = 'var(--gray-500)';
+
+  fetch(base + '/pull').then(function (r) {
+    if (!r.ok) throw new Error('电脑暂无待拉取的数据，请先在电脑端点「发送到手机」');
+    return r.text();
+  }).then(function (encData) {
+    var blob = new Blob([encData], { type: 'text/plain' });
+    var file = new File([blob], 'lan_pull.enc', { type: 'text/plain' });
+    importEncrypted(file);
+  }).catch(function (e) {
+    statusEl.textContent = '❌ ' + e.message;
+    statusEl.style.color = 'var(--danger)';
+  });
+}
+
+// Phone: Push data to PC
+function lanPushToPC() {
+  var addr = document.getElementById('lan-pc-address').value.trim();
+  if (!addr) return toast('请输入电脑IP地址', 'warning');
+  if (addr.indexOf(':') === -1) addr += ':8081';
+  var base = 'http://' + addr;
+  var password = document.getElementById('sync-password').value;
+  if (!password || password.length < 4) {
+    return toast('请先设置同步口令（至少4位）', 'warning');
+  }
+  var statusEl = document.getElementById('sync-status');
+  statusEl.textContent = '⏳ 正在推送到电脑...';
+  statusEl.style.color = 'var(--gray-500)';
+
+  encryptQuizData(password).then(function (b64) {
+    return fetch(base + '/push', { method: 'POST', body: b64 });
+  }).then(function (r) {
+    return r.json();
+  }).then(function (res) {
+    if (res.success) {
+      statusEl.textContent = '✅ 已推送到电脑！';
+      statusEl.style.color = 'var(--success)';
+      toast('数据已推送到电脑', 'success');
+    } else {
+      throw new Error(res.error || '推送失败');
+    }
+  }).catch(function (e) {
+    statusEl.textContent = '❌ ' + (e.message || '连接失败，请确认电脑已启动 sync_server.py');
+    statusEl.style.color = 'var(--danger)';
+  });
+}

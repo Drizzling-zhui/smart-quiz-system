@@ -461,6 +461,38 @@
       <p id="sync-status" style="font-size:11px;color:var(--gray-400);margin-top:8px;min-height:16px"></p>
     </div>
 
+    <!-- Section: LAN Sync -->
+    <div class="settings-section">
+      <div class="settings-section-title">📡 局域网同步</div>
+      <p style="font-size:12px;color:var(--gray-500);margin-bottom:10px">手机与电脑在同一WiFi下时，可直连传输数据，无需手动传文件。<br>需要电脑端先启动服务器：<code>python sync_server.py</code></p>
+
+      <div class="lan-sync-status" id="lan-sync-status">
+        <span id="lan-status-icon">⚪</span>
+        <span id="lan-status-text">服务器未连接</span>
+      </div>
+
+      <div class="lan-sync-actions">
+        <button onclick="lanStartReceive()" id="btn-lan-receive" style="padding:7px 14px;background:var(--primary);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px">📥 启动接收</button>
+        <button onclick="lanSendToPhone()" id="btn-lan-send" style="padding:7px 14px;background:#fff;color:var(--gray-600);border:1px solid var(--gray-300);border-radius:6px;cursor:pointer;font-size:13px">📤 发送到手机</button>
+        <button onclick="lanStopServer()" id="btn-lan-stop" style="padding:7px 14px;background:var(--danger);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;display:none">⏹ 停止</button>
+      </div>
+
+      <div class="lan-qr-area" id="lan-qr-area" style="display:none">
+        <p style="font-size:11px;color:var(--gray-500);margin:8px 0">手机扫码或浏览器访问：<br><strong id="lan-url-text" style="color:var(--primary)"></strong></p>
+        <img id="lan-qr-img" src="" style="width:180px;height:180px;border:1px solid var(--gray-200);border-radius:8px" alt="QR Code">
+        <p style="font-size:10px;color:var(--gray-400);margin-top:4px" id="lan-qr-hint"></p>
+      </div>
+
+      <div class="lan-manual" style="margin-top:8px">
+        <p style="font-size:11px;color:var(--gray-500);margin-bottom:4px">或手动输入电脑地址：</p>
+        <div style="display:flex;gap:6px">
+          <input type="text" id="lan-pc-address" placeholder="192.168.x.x:8081" style="flex:1;padding:6px 10px;border:1px solid var(--gray-300);border-radius:6px;font-size:12px">
+          <button onclick="lanPullFromPC()" style="padding:6px 12px;background:var(--primary);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;white-space:nowrap">拉取</button>
+          <button onclick="lanPushToPC()" style="padding:6px 12px;background:var(--success);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;white-space:nowrap">推送</button>
+        </div>
+      </div>
+    </div>
+
     <div class="modal-actions">
       <button class="btn-cancel" onclick="hideModal('settings')">关闭</button>
       <button class="btn-confirm" onclick="saveApiSettings()">保存</button>

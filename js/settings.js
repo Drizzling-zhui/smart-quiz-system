@@ -26,6 +26,7 @@ function showApiSettings() {
   document.getElementById('api-model').value = cfg.model;
   document.getElementById('api-key').value = cfg.key;
   if (typeof updateDirDisplay === 'function') updateDirDisplay();
+  if (typeof lanCheckServer === 'function') lanCheckServer();
   document.getElementById('modal-settings').classList.add('active');
 }
 

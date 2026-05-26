@@ -512,3 +512,10 @@ body.resizing .chat-resize-handle { background: rgba(79,110,247,.25); }
 .ip-tree-file { transition: background .12s; }
 .ip-tree-file:hover { background: var(--gray-100); }
 .ip-tree-file.active { background: var(--primary-light); color: var(--primary); font-weight: 600; }
+
+/* LAN Sync */
+.lan-sync-status { display: flex; align-items: center; gap: 6px; padding: 8px 10px; background: var(--gray-100); border-radius: 6px; font-size: 12px; margin-bottom: 8px; }
+.lan-sync-status.connected { background: #f0fdf4; color: var(--success); }
+.lan-sync-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.lan-qr-area { text-align: center; padding: 12px; background: var(--gray-100); border-radius: 8px; margin-top: 10px; }
+.lan-qr-area img { display: block; margin: 8px auto; }

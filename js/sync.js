@@ -178,10 +178,9 @@ function importEncrypted(file) {
         throw new Error('数据格式不正确，缺少学科数据');
       }
 
-      // Validate and normalize imported data
-      appData = data;
-      if (!appData.version) appData.version = '2.0';
-      appData.subjects.forEach(function (sub) {
+      // Normalize incoming data
+      if (!data.version) data.version = '2.0';
+      data.subjects.forEach(function (sub) {
         if (!sub.nodes) sub.nodes = [];
         sub.nodes.forEach(function (n) {
           if (n.type === 'file' && n.questions) {
@@ -194,17 +193,90 @@ function importEncrypted(file) {
           }
         });
       });
+
+      // Merge: for each incoming subject, find matching local subject and merge
+      var newSubjects = 0, newQuestions = 0, updatedQuestions = 0;
+      data.subjects.forEach(function (inSubj) {
+        var localSubj = getSubject(inSubj.name);
+        if (!localSubj) {
+          // New subject: add it
+          appData.subjects.push(inSubj);
+          newSubjects++;
+          inSubj.nodes.forEach(function (n) {
+            if (n.type === 'file' && n.questions) newQuestions += n.questions.length;
+          });
+        } else {
+          // Existing subject: merge nodes
+          mergeNodes(localSubj, inSubj);
+        }
+      });
+
+      function mergeNodes(localSubj, inSubj) {
+        if (!inSubj.nodes) return;
+        // Build a lookup of local nodes by path (name + parent name)
+        function nodePath(n, subj) {
+          var parts = [n.name];
+          var current = n;
+          while (current.parentId) {
+            var parent = (subj.nodes || []).find(function (x) { return x.id === current.parentId; });
+            if (!parent) break;
+            parts.unshift(parent.name);
+            current = parent;
+          }
+          return parts.join('/');
+        }
+
+        var localPaths = {};
+        (localSubj.nodes || []).forEach(function (n) {
+          localPaths[nodePath(n, localSubj)] = n;
+        });
+
+        (inSubj.nodes || []).forEach(function (inNode) {
+          var path = nodePath(inNode, inSubj);
+          var localNode = localPaths[path];
+          if (localNode && localNode.type === 'file' && inNode.type === 'file') {
+            // Merge questions by ID
+            var localQMap = {};
+            (localNode.questions || []).forEach(function (q) { localQMap[q.id] = q; });
+            (inNode.questions || []).forEach(function (inQ) {
+              if (localQMap[inQ.id]) {
+                // Update existing question (preserve local stats if newer)
+                var localQ = localQMap[inQ.id];
+                localQ.question = inQ.question;
+                localQ.answer = inQ.answer;
+                localQ.options = inQ.options;
+                localQ.type = inQ.type;
+                if (inQ.explanation) localQ.explanation = inQ.explanation;
+                updatedQuestions++;
+              } else {
+                // New question
+                localNode.questions.push(inQ);
+                newQuestions++;
+              }
+            });
+          } else if (!localNode) {
+            // New node (folder or file)
+            localSubj.nodes.push(inNode);
+            if (inNode.type === 'file' && inNode.questions) newQuestions += inNode.questions.length;
+          }
+          // If local node exists and is a folder, keep local version (folders are structural)
+        });
+      }
+
       saveData();
 
-      // Restore API config if present in bundle
+      // Merge API config if present in bundle
       if (bundle && bundle.apiConfig && bundle.apiConfig.endpoint) {
         try { localStorage.setItem('quiz_app_api_config', JSON.stringify(bundle.apiConfig)); } catch (e) {}
         extraInfo.push('API配置');
       }
 
-      // Restore favorites if present in bundle
+      // Merge favorites if present in bundle (union of both sets)
       if (bundle && Array.isArray(bundle.favorites)) {
-        favorites = bundle.favorites;
+        var favSet = {};
+        favorites.forEach(function (id) { favSet[id] = true; });
+        bundle.favorites.forEach(function (id) { favSet[id] = true; });
+        favorites = Object.keys(favSet).map(function (id) { return parseInt(id) || id; });
         saveFavorites();
         extraInfo.push('收藏');
       }
@@ -218,10 +290,14 @@ function importEncrypted(file) {
           if (n.type === 'file' && n.questions) totalQ += n.questions.length;
         });
       });
-      statusEl.textContent = '✅ 导入成功！' + appData.subjects.length + '个学科，' + totalQ + '道题' + (extraInfo.length ? '（' + extraInfo.join('、') + '已恢复）' : '');
+      var mergeMsg = '✅ 导入成功！' + appData.subjects.length + '个学科，' + totalQ + '道题';
+      if (newSubjects > 0) mergeMsg += '（新增' + newSubjects + '个学科）';
+      if (newQuestions > 0) mergeMsg += '（新增' + newQuestions + '题）';
+      if (updatedQuestions > 0) mergeMsg += '（更新' + updatedQuestions + '题）';
+      statusEl.textContent = mergeMsg + (extraInfo.length ? '，' + extraInfo.join('、') + '已恢复' : '');
       statusEl.style.color = 'var(--success)';
       document.getElementById('sync-import-file').value = '';
-      toast('导入成功：' + extraInfo.join('、') + '已恢复', 'success');
+      toast('导入成功：新增' + newQuestions + '题' + (updatedQuestions > 0 ? '，更新' + updatedQuestions + '题' : ''), 'success');
     }).catch(function (e) {
       statusEl.textContent = '❌ ' + e.message;
       statusEl.style.color = 'var(--danger)';

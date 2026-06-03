@@ -311,9 +311,30 @@ function importEncrypted(file) {
 }
 
 // Save export file — download on desktop, share modal on all platforms
+// Save export file — use Capacitor native Filesystem on mobile, download on desktop
 function _saveExportFile(blob, fileName, b64, totalQuestions, hasApi) {
-  // Method 1: anchor in DOM (must be attached to body for mobile WebView)
-  var savedPath = '';
+  // Try Capacitor native Filesystem first (APK)
+  try {
+    var C = window.Capacitor;
+    if (C && C.Plugins) {
+      var FS = C.Plugins.Filesystem;
+      // If plugin not registered yet, register it now
+      if (!FS && C.registerPlugin) {
+        FS = C.registerPlugin('Filesystem');
+      }
+      if (FS && FS.writeFile) {
+        FS.writeFile({ path: fileName, data: b64, directory: 4 }).then(function (r) {
+          var path = r.uri || 'Documents/' + fileName;
+          _showExportModal(fileName, b64, totalQuestions, blob, path);
+        }).catch(function (e) {
+          _showExportModal(fileName, b64, totalQuestions, blob, '保存失败: ' + (e.message || ''));
+        });
+        return;
+      }
+    }
+  } catch (e) {}
+
+  // Desktop fallback: anchor download
   try {
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
@@ -326,25 +347,11 @@ function _saveExportFile(blob, fileName, b64, totalQuestions, hasApi) {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     }, 2000);
-    savedPath = '下载目录';
+    _showExportModal(fileName, b64, totalQuestions, blob, '下载目录');
+    return;
   } catch (e) {}
 
-  // Method 2: Capacitor Filesystem (APK)
-  try {
-    var C = window.Capacitor;
-    if (C && C.Plugins && C.Plugins.Filesystem) {
-      C.Plugins.Filesystem.writeFile({
-        path: fileName,
-        data: b64,
-        directory: 4
-      }).then(function (r) {
-        savedPath = r.uri || 'Documents/' + fileName;
-        toast('已保存：' + savedPath, 'success');
-      }).catch(function () {});
-    }
-  } catch (e) {}
-
-  _showExportModal(fileName, b64, totalQuestions, blob, savedPath);
+  _showExportModal(fileName, b64, totalQuestions, blob, '');
 }
 
 function _showExportModal(fileName, content, totalQuestions, blob, savedPath) {

@@ -215,23 +215,25 @@ function handleDragEnd(e) {
 function handleDragOver(e, nodeId) {
   e.preventDefault();
   e.dataTransfer.dropEffect = 'move';
+  var el = e.currentTarget;
   if (!_dragNodeId || _dragNodeId === nodeId || isDescendantOf(_dragNodeId, nodeId)) {
-    e.target.classList.add('drag-invalid');
-    e.target.classList.remove('drag-over');
+    el.classList.add('drag-invalid');
+    el.classList.remove('drag-over');
     return;
   }
-  e.target.classList.add('drag-over');
-  e.target.classList.remove('drag-invalid');
+  el.classList.add('drag-over');
+  el.classList.remove('drag-invalid');
 }
 
 function handleDragLeave(e) {
-  if (e.relatedTarget && e.target.contains(e.relatedTarget)) return;
-  e.target.classList.remove('drag-over', 'drag-invalid');
+  var el = e.currentTarget;
+  if (e.relatedTarget && el.contains(e.relatedTarget)) return;
+  el.classList.remove('drag-over', 'drag-invalid');
 }
 
 function handleDrop(e, targetNodeId) {
   e.preventDefault();
-  e.target.classList.remove('drag-over', 'drag-invalid');
+  e.currentTarget.classList.remove('drag-over', 'drag-invalid');
   var nodeId = _dragNodeId;
   _dragNodeId = null;
   if (!nodeId || nodeId === targetNodeId) return;

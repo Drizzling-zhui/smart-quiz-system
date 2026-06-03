@@ -132,29 +132,13 @@ function exportEncrypted() {
     var hasApi = !!(getApiConfig().key);
     var fileName = 'quiz-data_' + new Date().toISOString().slice(0, 10) + '.enc';
 
-    // Try download first (desktop), fall back to text display (mobile/APK)
-    var downloaded = false;
-    try {
-      var blob = new Blob([b64], { type: 'application/octet-stream' });
-      var url = URL.createObjectURL(blob);
-      var a = document.createElement('a');
-      a.href = url;
-      a.download = fileName;
-      a.click();
-      URL.revokeObjectURL(url);
-      downloaded = true;
-    } catch (e) {}
-
+    var blob = new Blob([b64], { type: 'application/octet-stream' });
     var msg = '✅ 导出成功！' + appData.subjects.length + '个学科，' + totalQuestions + '道题';
     statusEl.textContent = msg;
     statusEl.style.color = 'var(--success)';
 
-    if (downloaded && typeof window.Capacitor === 'undefined') {
-      toast('加密导出成功（含题库数据' + (hasApi ? '、API配置' : '') + '、收藏）', 'success');
-    } else {
-      // Mobile/APK: show the encrypted text for manual copy
-      showExportResultModal(fileName, b64, totalQuestions + '题 / ' + appData.subjects.length + '个学科');
-    }
+    // Save file: desktop downloads, mobile shares or saves
+    _saveExportFile(blob, fileName, b64, totalQuestions, hasApi);
   }).catch(function (e) {
     statusEl.textContent = '❌ 加密失败：' + e.message;
     statusEl.style.color = 'var(--danger)';
@@ -326,9 +310,50 @@ function importEncrypted(file) {
   reader.readAsText(file);
 }
 
-// Show export result in a modal (for mobile/APK where download doesn't work)
-function showExportResultModal(fileName, content, summary) {
-  // Remove existing modal if any
+// Save export file — desktop download, mobile share/save
+function _saveExportFile(blob, fileName, b64, totalQuestions, hasApi) {
+  // Method 1: desktop browser — a.click() download
+  if (typeof window.Capacitor === 'undefined') {
+    try {
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url; a.download = fileName; a.click();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+      toast('加密导出成功（' + (hasApi ? '含API配置、' : '') + '收藏）', 'success');
+      return;
+    } catch (e) {}
+  }
+
+  // Method 2: mobile — Web Share API (can share as file)
+  if (navigator.canShare && navigator.canShare({ files: [new File([blob], fileName, { type: 'application/octet-stream' })] })) {
+    navigator.share({
+      files: [new File([blob], fileName, { type: 'application/octet-stream' })],
+      title: '题库加密导出'
+    }).then(function () {
+      toast('已分享导出文件', 'success');
+    }).catch(function () {
+      // User cancelled share, show fallback
+      _showExportModal(fileName, b64, totalQuestions);
+    });
+    return;
+  }
+
+  // Method 3: mobile — try opening blob URL (triggers download in some browsers)
+  try {
+    var blobUrl = URL.createObjectURL(blob);
+    var w = window.open(blobUrl, '_blank');
+    if (w) {
+      setTimeout(function () { URL.revokeObjectURL(blobUrl); }, 3000);
+      toast('文件已保存到下载目录', 'success');
+      return;
+    }
+  } catch (e) {}
+
+  // Method 4: fallback — show text for manual copy
+  _showExportModal(fileName, b64, totalQuestions);
+}
+
+function _showExportModal(fileName, content, totalQuestions) {
   var existing = document.getElementById('modal-export-result');
   if (existing) existing.remove();
 
@@ -337,8 +362,8 @@ function showExportResultModal(fileName, content, summary) {
   overlay.id = 'modal-export-result';
   overlay.innerHTML = '<div class="modal" style="max-width:520px">' +
     '<h3>📤 加密导出成功</h3>' +
-    '<p style="font-size:12px;color:var(--gray-500);margin-bottom:8px">' + summary + '，文件：' + fileName + '</p>' +
-    '<p style="font-size:11px;color:var(--warning);margin-bottom:8px">⚠️ 移动端不支持直接下载文件，请复制下方内容，粘贴到备忘录保存为 <code>' + fileName + '</code></p>' +
+    '<p style="font-size:12px;color:var(--gray-500);margin-bottom:8px">' + totalQuestions + '题，文件：' + fileName + '</p>' +
+    '<p style="font-size:11px;color:var(--warning);margin-bottom:8px">⚠️ 如未自动保存，请复制内容粘贴到备忘录，保存为 <code>' + fileName + '</code></p>' +
     '<textarea readonly rows="6" style="width:100%;font-size:11px;font-family:monospace;padding:8px;border:1px solid var(--gray-300);border-radius:6px;resize:vertical;word-break:break-all" onclick="this.select()">' + content + '</textarea>' +
     '<div class="modal-actions" style="margin-top:10px">' +
       '<button class="btn-primary" onclick="navigator.clipboard.writeText(document.querySelector(\'#modal-export-result textarea\').value);toast(\'已复制到剪贴板\',\'success\')">📋 复制</button>' +

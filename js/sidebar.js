@@ -206,8 +206,8 @@ function handleDragStart(e, nodeId) {
 
 function handleDragEnd(e) {
   _dragNodeId = null;
-  document.querySelectorAll('.tree-node.dragging, .tree-node.drag-over, .tree-node.drag-invalid, .tree-node.drag-before, .tree-node.drag-after').forEach(function (el) {
-    el.classList.remove('dragging', 'drag-over', 'drag-invalid', 'drag-before', 'drag-after');
+  document.querySelectorAll('.tree-node.dragging, .tree-node.drag-over, .tree-node.drag-invalid').forEach(function (el) {
+    el.classList.remove('dragging', 'drag-over', 'drag-invalid');
   });
   var list = document.getElementById('subject-list');
   if (list) list.classList.remove('drag-new-subject');
@@ -217,102 +217,28 @@ function handleDragOver(e, nodeId) {
   e.preventDefault();
   e.dataTransfer.dropEffect = 'move';
   var el = e.currentTarget;
-  var isFolder = el.classList.contains('folder-node');
-
   if (!_dragNodeId || _dragNodeId === nodeId || isDescendantOf(_dragNodeId, nodeId)) {
     el.classList.add('drag-invalid');
-    el.classList.remove('drag-over', 'drag-before', 'drag-after');
+    el.classList.remove('drag-over');
     return;
   }
-
-  // Top half = before, bottom half = after (folder middle = into)
-  var rect = el.getBoundingClientRect();
-  var ratio = (e.clientY - rect.top) / rect.height;
-  el.classList.remove('drag-invalid', 'drag-over', 'drag-before', 'drag-after');
-
-  if (isFolder && ratio >= 0.3 && ratio <= 0.7) {
-    el.classList.add('drag-over');
-  } else if (ratio < 0.5) {
-    el.classList.add('drag-before');
-  } else {
-    el.classList.add('drag-after');
-  }
+  el.classList.add('drag-over');
+  el.classList.remove('drag-invalid');
 }
 
 function handleDragLeave(e) {
   var el = e.currentTarget;
   if (e.relatedTarget && el.contains(e.relatedTarget)) return;
-  el.classList.remove('drag-over', 'drag-invalid', 'drag-before', 'drag-after');
+  el.classList.remove('drag-over', 'drag-invalid');
 }
 
 function handleDrop(e, targetNodeId) {
   e.preventDefault();
-  var el = e.currentTarget;
-  el.classList.remove('drag-over', 'drag-invalid', 'drag-before', 'drag-after');
+  e.currentTarget.classList.remove('drag-over', 'drag-invalid');
   var nodeId = _dragNodeId;
   _dragNodeId = null;
   if (!nodeId || nodeId === targetNodeId) return;
-
-  var isFolder = el.classList.contains('folder-node');
-  var rect = el.getBoundingClientRect();
-  var ratio = (e.clientY - rect.top) / rect.height;
-
-  if (isFolder && ratio >= 0.3 && ratio <= 0.7) {
-    moveNode(nodeId, targetNodeId);
-  } else if (ratio < 0.5) {
-    insertNodeAt(nodeId, targetNodeId, true);
-  } else {
-    insertNodeAt(nodeId, targetNodeId, false);
-  }
-}
-
-function insertNodeAt(nodeId, refNodeId, before) {
-  var node = getNode(nodeId);
-  var refNode = getNode(refNodeId);
-  if (!node || !refNode || nodeId === refNodeId) return;
-  if (isDescendantOf(nodeId, refNodeId)) return;
-
-  var sourceSubj = getSubjectByNodeId(nodeId);
-  var targetSubj = getSubjectByNodeId(refNodeId);
-  if (!sourceSubj || !targetSubj) return;
-
-  var toMoveIds = [nodeId];
-  collectDescendantIds(nodeId, sourceSubj, toMoveIds);
-
-  // Remove from source
-  var movedNodes = [];
-  for (var i = sourceSubj.nodes.length - 1; i >= 0; i--) {
-    if (toMoveIds.indexOf(sourceSubj.nodes[i].id) !== -1) {
-      movedNodes.push(sourceSubj.nodes[i]);
-      sourceSubj.nodes.splice(i, 1);
-    }
-  }
-
-  // Find insert position in target subject
-  var refIdx = targetSubj.nodes.indexOf(refNode);
-  if (refIdx === -1) refIdx = targetSubj.nodes.length;
-  var insertIdx = before ? refIdx : refIdx + 1;
-
-  // Insert all moved nodes at the position
-  for (var j = movedNodes.length - 1; j >= 0; j--) {
-    targetSubj.nodes.splice(insertIdx, 0, movedNodes[j]);
-  }
-
-  // Update parentId to match the reference node's parent
-  node.parentId = refNode.parentId;
-
-  // Clean up: if source subject lost its root and is now empty, remove it
-  if (sourceSubj !== targetSubj) {
-    var hasRoot = sourceSubj.nodes.some(function (n) { return n.parentId === null; });
-    if (!hasRoot) {
-      var idx = appData.subjects.indexOf(sourceSubj);
-      if (idx !== -1) appData.subjects.splice(idx, 1);
-    }
-  }
-
-  saveData();
-  renderSidebar();
-  toast('已移动「' + node.name + '」', 'info');
+  moveNode(nodeId, targetNodeId);
 }
 
 function moveNode(nodeId, targetParentId) {
@@ -345,16 +271,6 @@ function moveNode(nodeId, targetParentId) {
 
   node.parentId = targetParentId;
   target.expanded = true;
-
-  // Clean up: if source subject lost its root, remove empty subject
-  if (sourceSubj !== targetSubj) {
-    var hasRoot = sourceSubj.nodes.some(function (n) { return n.parentId === null; });
-    if (!hasRoot) {
-      var idx = appData.subjects.indexOf(sourceSubj);
-      if (idx !== -1) appData.subjects.splice(idx, 1);
-    }
-  }
-
   saveData();
   renderSidebar();
   toast('已移动「' + node.name + '」', 'info');
@@ -364,17 +280,10 @@ function moveNode(nodeId, targetParentId) {
 // DROP ON EMPTY AREA → NEW SUBJECT
 // ============================================================
 function handleListDragOver(e) {
-  // Only trigger new-subject when below all tree nodes
   if (e.target.closest('.tree-node')) return;
-  var list = e.currentTarget;
-  var last = list.querySelector('.tree-node:last-of-type');
-  if (last) {
-    var r = last.getBoundingClientRect();
-    if (e.clientY < r.bottom + 12) return;
-  }
   e.preventDefault();
   e.dataTransfer.dropEffect = 'move';
-  list.classList.add('drag-new-subject');
+  e.currentTarget.classList.add('drag-new-subject');
 }
 
 function handleListDragLeave(e) {
@@ -382,14 +291,8 @@ function handleListDragLeave(e) {
 }
 
 function handleListDrop(e) {
-  var list = e.currentTarget;
-  list.classList.remove('drag-new-subject');
+  e.currentTarget.classList.remove('drag-new-subject');
   if (e.target.closest('.tree-node')) return;
-  var last = list.querySelector('.tree-node:last-of-type');
-  if (last) {
-    var r = last.getBoundingClientRect();
-    if (e.clientY < r.bottom + 12) return;
-  }
   e.preventDefault();
   var nodeId = _dragNodeId;
   _dragNodeId = null;

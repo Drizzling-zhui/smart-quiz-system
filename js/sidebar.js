@@ -206,8 +206,8 @@ function handleDragStart(e, nodeId) {
 
 function handleDragEnd(e) {
   _dragNodeId = null;
-  document.querySelectorAll('.tree-node.dragging, .tree-node.drag-over, .tree-node.drag-invalid').forEach(function (el) {
-    el.classList.remove('dragging', 'drag-over', 'drag-invalid');
+  document.querySelectorAll('.tree-node.dragging, .tree-node.drag-over, .tree-node.drag-invalid, .tree-node.drag-before, .tree-node.drag-after').forEach(function (el) {
+    el.classList.remove('dragging', 'drag-over', 'drag-invalid', 'drag-before', 'drag-after');
   });
   var list = document.getElementById('subject-list');
   if (list) list.classList.remove('drag-new-subject');
@@ -217,28 +217,99 @@ function handleDragOver(e, nodeId) {
   e.preventDefault();
   e.dataTransfer.dropEffect = 'move';
   var el = e.currentTarget;
+  var isFolder = el.classList.contains('folder-node');
+
   if (!_dragNodeId || _dragNodeId === nodeId || isDescendantOf(_dragNodeId, nodeId)) {
     el.classList.add('drag-invalid');
-    el.classList.remove('drag-over');
+    el.classList.remove('drag-over', 'drag-before', 'drag-after');
     return;
   }
-  el.classList.add('drag-over');
-  el.classList.remove('drag-invalid');
+
+  var ratio = (e.clientY - el.getBoundingClientRect().top) / el.getBoundingClientRect().height;
+  el.classList.remove('drag-invalid', 'drag-over', 'drag-before', 'drag-after');
+
+  if (isFolder && ratio >= 0.3 && ratio <= 0.7) {
+    el.classList.add('drag-over');
+  } else if (ratio < 0.5) {
+    el.classList.add('drag-before');
+  } else {
+    el.classList.add('drag-after');
+  }
 }
 
 function handleDragLeave(e) {
   var el = e.currentTarget;
   if (e.relatedTarget && el.contains(e.relatedTarget)) return;
-  el.classList.remove('drag-over', 'drag-invalid');
+  el.classList.remove('drag-over', 'drag-invalid', 'drag-before', 'drag-after');
 }
 
 function handleDrop(e, targetNodeId) {
   e.preventDefault();
-  e.currentTarget.classList.remove('drag-over', 'drag-invalid');
+  var el = e.currentTarget;
+  el.classList.remove('drag-over', 'drag-invalid', 'drag-before', 'drag-after');
   var nodeId = _dragNodeId;
   _dragNodeId = null;
   if (!nodeId || nodeId === targetNodeId) return;
-  moveNode(nodeId, targetNodeId);
+
+  var isFolder = el.classList.contains('folder-node');
+  var ratio = (e.clientY - el.getBoundingClientRect().top) / el.getBoundingClientRect().height;
+
+  if (isFolder && ratio >= 0.3 && ratio <= 0.7) {
+    moveNode(nodeId, targetNodeId);
+  } else if (ratio < 0.5) {
+    insertNodeAt(nodeId, targetNodeId, true);
+  } else {
+    insertNodeAt(nodeId, targetNodeId, false);
+  }
+}
+
+function insertNodeAt(nodeId, refNodeId, before) {
+  var node = getNode(nodeId);
+  var refNode = getNode(refNodeId);
+  if (!node || !refNode || nodeId === refNodeId) return;
+  if (isDescendantOf(nodeId, refNodeId)) return;
+
+  var sourceSubj = getSubjectByNodeId(nodeId);
+  var targetSubj = getSubjectByNodeId(refNodeId);
+  if (!sourceSubj || !targetSubj) return;
+
+  var toMoveIds = [nodeId];
+  collectDescendantIds(nodeId, sourceSubj, toMoveIds);
+
+  // Remove from source, preserving order with unshift
+  var movedNodes = [];
+  for (var i = sourceSubj.nodes.length - 1; i >= 0; i--) {
+    if (toMoveIds.indexOf(sourceSubj.nodes[i].id) !== -1) {
+      movedNodes.unshift(sourceSubj.nodes[i]);
+      sourceSubj.nodes.splice(i, 1);
+    }
+  }
+
+  // Find insert position in target subject
+  var refIdx = targetSubj.nodes.indexOf(refNode);
+  if (refIdx === -1) refIdx = targetSubj.nodes.length;
+  var insertIdx = before ? refIdx : refIdx + 1;
+
+  // Insert preserving order
+  for (var j = 0; j < movedNodes.length; j++) {
+    targetSubj.nodes.splice(insertIdx + j, 0, movedNodes[j]);
+  }
+
+  // Become sibling of refNode (same parent level)
+  node.parentId = refNode.parentId;
+
+  // Clean up empty source subject
+  if (sourceSubj !== targetSubj) {
+    var hasRoot = sourceSubj.nodes.some(function (n) { return n.parentId === null; });
+    if (!hasRoot) {
+      var idx = appData.subjects.indexOf(sourceSubj);
+      if (idx !== -1) appData.subjects.splice(idx, 1);
+    }
+  }
+
+  saveData();
+  renderSidebar();
+  toast('已移动「' + node.name + '」', 'info');
 }
 
 function moveNode(nodeId, targetParentId) {

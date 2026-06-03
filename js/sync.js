@@ -78,6 +78,14 @@ function decryptQuizData(base64Data, password) {
   password = password.trim();
   if (!base64Data) return Promise.reject(new Error('数据为空'));
 
+  // Normalize input: trim whitespace, remove BOM, remove line breaks
+  base64Data = base64Data.replace(/^﻿/, '').replace(/\s+/g, '').trim();
+
+  // Validate base64 chars before trying to decode
+  if (!/^[A-Za-z0-9+/=]+$/.test(base64Data)) {
+    return Promise.reject(new Error('文件内容不是有效的加密数据，请确认选择了正确的.enc文件'));
+  }
+
   try {
     var buf = _syncBase64ToBuffer(base64Data);
   } catch (e) {

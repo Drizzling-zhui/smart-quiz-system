@@ -225,19 +225,18 @@ function handleDragOver(e, nodeId) {
     return;
   }
 
-  // Detect position: top 25% = before, bottom 25% = after, middle = into
+  // Top half = before, bottom half = after (folder middle = into)
   var rect = el.getBoundingClientRect();
   var ratio = (e.clientY - rect.top) / rect.height;
   el.classList.remove('drag-invalid', 'drag-over', 'drag-before', 'drag-after');
 
-  if (ratio < 0.25) {
-    el.classList.add('drag-before');
-  } else if (ratio > 0.75) {
-    el.classList.add('drag-after');
-  } else if (isFolder) {
+  if (isFolder && ratio >= 0.3 && ratio <= 0.7) {
     el.classList.add('drag-over');
+  } else if (ratio < 0.5) {
+    el.classList.add('drag-before');
+  } else {
+    el.classList.add('drag-after');
   }
-  // For files in middle area: no indicator (can't drop into a file)
 }
 
 function handleDragLeave(e) {
@@ -254,26 +253,17 @@ function handleDrop(e, targetNodeId) {
   _dragNodeId = null;
   if (!nodeId || nodeId === targetNodeId) return;
 
+  var isFolder = el.classList.contains('folder-node');
   var rect = el.getBoundingClientRect();
   var ratio = (e.clientY - rect.top) / rect.height;
-  var isFolder = el.classList.contains('folder-node');
 
-  if (ratio < 0.25) {
-    insertNodeBefore(nodeId, targetNodeId);
-  } else if (ratio > 0.75) {
-    insertNodeAfter(nodeId, targetNodeId);
-  } else if (isFolder) {
+  if (isFolder && ratio >= 0.3 && ratio <= 0.7) {
     moveNode(nodeId, targetNodeId);
+  } else if (ratio < 0.5) {
+    insertNodeAt(nodeId, targetNodeId, true);
+  } else {
+    insertNodeAt(nodeId, targetNodeId, false);
   }
-  // Files in middle: do nothing
-}
-
-function insertNodeBefore(nodeId, beforeNodeId) {
-  insertNodeAt(nodeId, beforeNodeId, true);
-}
-
-function insertNodeAfter(nodeId, afterNodeId) {
-  insertNodeAt(nodeId, afterNodeId, false);
 }
 
 function insertNodeAt(nodeId, refNodeId, before) {
@@ -311,6 +301,15 @@ function insertNodeAt(nodeId, refNodeId, before) {
   // Update parentId to match the reference node's parent
   node.parentId = refNode.parentId;
 
+  // Clean up: if source subject lost its root and is now empty, remove it
+  if (sourceSubj !== targetSubj) {
+    var hasRoot = sourceSubj.nodes.some(function (n) { return n.parentId === null; });
+    if (!hasRoot) {
+      var idx = appData.subjects.indexOf(sourceSubj);
+      if (idx !== -1) appData.subjects.splice(idx, 1);
+    }
+  }
+
   saveData();
   renderSidebar();
   toast('已移动「' + node.name + '」', 'info');
@@ -346,6 +345,16 @@ function moveNode(nodeId, targetParentId) {
 
   node.parentId = targetParentId;
   target.expanded = true;
+
+  // Clean up: if source subject lost its root, remove empty subject
+  if (sourceSubj !== targetSubj) {
+    var hasRoot = sourceSubj.nodes.some(function (n) { return n.parentId === null; });
+    if (!hasRoot) {
+      var idx = appData.subjects.indexOf(sourceSubj);
+      if (idx !== -1) appData.subjects.splice(idx, 1);
+    }
+  }
+
   saveData();
   renderSidebar();
   toast('已移动「' + node.name + '」', 'info');

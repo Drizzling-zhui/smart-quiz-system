@@ -20,7 +20,18 @@ function renderSidebar() {
       '<span class="tree-count">' + totalQ + '题</span>' +
     '</div>';
     if (!collapsed) {
-      html += renderTreeNode(root, s, 0);
+      var rootChildren = getChildrenNodes(root.id, s);
+      rootChildren.sort(function (a, b) {
+        if (a.type !== b.type) return a.type === 'folder' ? -1 : 1;
+        return a.name.localeCompare(b.name, 'zh-CN');
+      });
+      if (rootChildren.length) {
+        rootChildren.forEach(function (child) {
+          html += renderTreeNode(child, s, 0);
+        });
+      } else {
+        html += '<div class="tree-empty" style="padding-left:14px">空学科，请添加题库</div>';
+      }
     }
   });
   c.innerHTML = html;

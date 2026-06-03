@@ -261,8 +261,30 @@ function moveNode(nodeId, targetParentId) {
   if (target.type !== 'folder') return;
   if (node.parentId === targetParentId) return;
   if (isDescendantOf(nodeId, targetParentId)) return;
+  // Don't allow moving root nodes
+  if (node.parentId === null) return;
+
+  var sourceSubj = getSubjectByNodeId(nodeId);
+  var targetSubj = getSubjectByNodeId(targetParentId);
+  if (!sourceSubj || !targetSubj) return;
+
+  // Collect node and all descendants to move
+  var toMoveIds = [nodeId];
+  collectDescendantIds(nodeId, sourceSubj, toMoveIds);
+
+  if (sourceSubj !== targetSubj) {
+    // Move nodes between subjects
+    var movedNodes = [];
+    for (var i = sourceSubj.nodes.length - 1; i >= 0; i--) {
+      if (toMoveIds.indexOf(sourceSubj.nodes[i].id) !== -1) {
+        movedNodes.push(sourceSubj.nodes[i]);
+        sourceSubj.nodes.splice(i, 1);
+      }
+    }
+    targetSubj.nodes = targetSubj.nodes.concat(movedNodes);
+  }
+
   node.parentId = targetParentId;
-  // Auto-expand target folder
   target.expanded = true;
   saveData();
   renderSidebar();

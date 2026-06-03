@@ -129,18 +129,32 @@ function exportEncrypted() {
   });
 
   encryptQuizData(password).then(function (b64) {
-    var blob = new Blob([b64], { type: 'application/octet-stream' });
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement('a');
-    a.href = url;
-    a.download = 'quiz-data_' + new Date().toISOString().slice(0, 10) + '.enc';
-    a.click();
-    URL.revokeObjectURL(url);
-
     var hasApi = !!(getApiConfig().key);
-    statusEl.textContent = '✅ 导出成功！' + appData.subjects.length + '个学科，' + totalQuestions + '道题' + (hasApi ? '，含API配置' : '');
+    var fileName = 'quiz-data_' + new Date().toISOString().slice(0, 10) + '.enc';
+
+    // Try download first (desktop), fall back to text display (mobile/APK)
+    var downloaded = false;
+    try {
+      var blob = new Blob([b64], { type: 'application/octet-stream' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      a.click();
+      URL.revokeObjectURL(url);
+      downloaded = true;
+    } catch (e) {}
+
+    var msg = '✅ 导出成功！' + appData.subjects.length + '个学科，' + totalQuestions + '道题';
+    statusEl.textContent = msg;
     statusEl.style.color = 'var(--success)';
-    toast('加密导出成功（含题库数据' + (hasApi ? '、API配置' : '') + '、收藏）', 'success');
+
+    if (downloaded && typeof window.Capacitor === 'undefined') {
+      toast('加密导出成功（含题库数据' + (hasApi ? '、API配置' : '') + '、收藏）', 'success');
+    } else {
+      // Mobile/APK: show the encrypted text for manual copy
+      showExportResultModal(fileName, b64, totalQuestions + '题 / ' + appData.subjects.length + '个学科');
+    }
   }).catch(function (e) {
     statusEl.textContent = '❌ 加密失败：' + e.message;
     statusEl.style.color = 'var(--danger)';
@@ -310,6 +324,31 @@ function importEncrypted(file) {
     statusEl.style.color = 'var(--danger)';
   };
   reader.readAsText(file);
+}
+
+// Show export result in a modal (for mobile/APK where download doesn't work)
+function showExportResultModal(fileName, content, summary) {
+  // Remove existing modal if any
+  var existing = document.getElementById('modal-export-result');
+  if (existing) existing.remove();
+
+  var overlay = document.createElement('div');
+  overlay.className = 'modal-overlay active';
+  overlay.id = 'modal-export-result';
+  overlay.innerHTML = '<div class="modal" style="max-width:520px">' +
+    '<h3>📤 加密导出成功</h3>' +
+    '<p style="font-size:12px;color:var(--gray-500);margin-bottom:8px">' + summary + '，文件：' + fileName + '</p>' +
+    '<p style="font-size:11px;color:var(--warning);margin-bottom:8px">⚠️ 移动端不支持直接下载文件，请复制下方内容，粘贴到备忘录保存为 <code>' + fileName + '</code></p>' +
+    '<textarea readonly rows="6" style="width:100%;font-size:11px;font-family:monospace;padding:8px;border:1px solid var(--gray-300);border-radius:6px;resize:vertical;word-break:break-all" onclick="this.select()">' + content + '</textarea>' +
+    '<div class="modal-actions" style="margin-top:10px">' +
+      '<button class="btn-primary" onclick="navigator.clipboard.writeText(document.querySelector(\'#modal-export-result textarea\').value);toast(\'已复制到剪贴板\',\'success\')">📋 复制</button>' +
+      '<button class="btn-cancel" onclick="document.getElementById(\'modal-export-result\').remove()">关闭</button>' +
+    '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', function (e) {
+    if (e.target === overlay) overlay.remove();
+  });
 }
 
 // Clear password field on settings close

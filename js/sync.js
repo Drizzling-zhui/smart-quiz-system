@@ -312,77 +312,78 @@ function importEncrypted(file) {
 
 // Save export file — download on desktop, share modal on all platforms
 function _saveExportFile(blob, fileName, b64, totalQuestions, hasApi) {
-  // Desktop: trigger download
+  // Method 1: anchor in DOM (must be attached to body for mobile WebView)
+  var savedPath = '';
   try {
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
-    a.href = url; a.download = fileName; a.click();
-    setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
+    a.href = url;
+    a.download = fileName;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 2000);
+    savedPath = '下载目录';
   } catch (e) {}
 
-  // Show modal with share + copy (works on mobile and desktop)
-  _showExportModal(fileName, b64, totalQuestions, blob);
+  // Method 2: Capacitor Filesystem (APK)
+  try {
+    var C = window.Capacitor;
+    if (C && C.Plugins && C.Plugins.Filesystem) {
+      C.Plugins.Filesystem.writeFile({
+        path: fileName,
+        data: b64,
+        directory: 4
+      }).then(function (r) {
+        savedPath = r.uri || 'Documents/' + fileName;
+        toast('已保存：' + savedPath, 'success');
+      }).catch(function () {});
+    }
+  } catch (e) {}
+
+  _showExportModal(fileName, b64, totalQuestions, blob, savedPath);
 }
 
-function _showExportModal(fileName, content, totalQuestions, blob) {
+function _showExportModal(fileName, content, totalQuestions, blob, savedPath) {
   var existing = document.getElementById('modal-export-result');
   if (existing) existing.remove();
 
   var overlay = document.createElement('div');
   overlay.className = 'modal-overlay active';
   overlay.id = 'modal-export-result';
-  overlay.innerHTML = '<div class="modal" style="max-width:440px">' +
+  overlay.innerHTML = '<div class="modal" style="max-width:400px;text-align:center">' +
     '<h3>📤 加密导出成功</h3>' +
-    '<p style="font-size:13px;color:var(--gray-700);margin:8px 0">' + totalQuestions + '题 · ' + fileName + '</p>' +
-    '<p style="font-size:12px;color:var(--gray-500);margin-bottom:6px">点击「分享文件」保存到本地或发送到微信</p>' +
-    '<textarea readonly rows="4" style="width:100%;font-size:11px;font-family:monospace;padding:8px;border:1px solid var(--gray-300);border-radius:6px;word-break:break-all;margin-bottom:8px" onclick="this.select()">' + content + '</textarea>' +
-    '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+    '<p style="font-size:13px;color:var(--gray-700);margin:6px 0">' + totalQuestions + '题 · ' + fileName + '</p>' +
+    (savedPath ? '<p style="font-size:11px;color:var(--primary);margin:4px 0">📁 ' + savedPath + '</p>' : '') +
+    '<div style="display:flex;gap:8px;justify-content:center;margin-top:12px;flex-wrap:wrap">' +
       '<button class="btn-primary" id="btn-export-share">📤 分享文件</button>' +
-      '<button class="btn-outline" id="btn-export-copy">📋 复制内容</button>' +
       '<button class="btn-cancel" id="btn-export-close">关闭</button>' +
     '</div>' +
     '</div>';
   document.body.appendChild(overlay);
 
-  // Bind events
   document.getElementById('btn-export-close').onclick = function () { overlay.remove(); };
-  document.getElementById('btn-export-copy').onclick = function () {
-    navigator.clipboard.writeText(content).then(function () {
-      toast('已复制到剪贴板', 'success');
-    }).catch(function () {
-      // Fallback: select textarea if it exists, otherwise create one
-      var ta = overlay.querySelector('textarea');
-      if (!ta) {
-        ta = document.createElement('textarea');
-        ta.value = content; ta.style.position = 'fixed'; ta.style.left = '-9999px';
-        document.body.appendChild(ta);
-      }
+  document.getElementById('btn-export-share').onclick = function () {
+    var file = new File([blob], fileName, { type: 'application/octet-stream' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      navigator.share({ files: [file], title: '题库加密导出' }).catch(function () {});
+    } else if (navigator.share) {
+      navigator.share({ title: '题库加密导出', text: content }).catch(function () {});
+    } else {
+      // Create hidden textarea, copy, and prompt
+      var ta = document.createElement('textarea');
+      ta.value = content;
+      ta.style.cssText = 'position:fixed;left:-9999px;top:-9999px';
+      document.body.appendChild(ta);
       ta.select();
       document.execCommand('copy');
-      if (!overlay.querySelector('textarea')) document.body.removeChild(ta);
-      toast('已复制到剪贴板', 'success');
-    });
+      document.body.removeChild(ta);
+      toast('已复制加密内容，请粘贴到备忘录保存为 ' + fileName, 'info');
+    }
   };
-
-  var shareBtn = document.getElementById('btn-export-share');
-  if (shareBtn) {
-    shareBtn.onclick = function () {
-      var file = new File([blob], fileName, { type: 'application/octet-stream' });
-      // Try file share first, fallback to text share
-      var doShare = function (data) {
-        navigator.share(data).catch(function () {
-          toast('分享失败，请用复制按钮', 'warning');
-        });
-      };
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        doShare({ files: [file], title: '题库加密导出' });
-      } else if (navigator.share) {
-        doShare({ text: content, title: '题库加密导出' });
-      } else {
-        toast('当前环境不支持分享，请用复制按钮', 'warning');
-      }
-    };
-  }
 
   overlay.addEventListener('click', function (e) { if (e.target === overlay) overlay.remove(); });
 }

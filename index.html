@@ -20,7 +20,7 @@
       <button onclick="showApiSettings()" title="API设置">⚙️</button>
     </div>
     <div id="sync-status" style="padding:4px 14px;font-size:11px;text-align:center;cursor:pointer" onclick="showApiSettings()" title="点击打开设置管理数据目录"></div>
-    <div id="subject-list"></div>
+    <div id="subject-list" ondragover="handleListDragOver(event)" ondragleave="handleListDragLeave(event)" ondrop="handleListDrop(event)"></div>
     <div class="sidebar-footer">
       <button onclick="promptNewSubject()">＋ 添加学科</button>
     </div>

@@ -209,6 +209,8 @@ function handleDragEnd(e) {
   document.querySelectorAll('.tree-node.dragging, .tree-node.drag-over, .tree-node.drag-invalid').forEach(function (el) {
     el.classList.remove('dragging', 'drag-over', 'drag-invalid');
   });
+  var list = document.getElementById('subject-list');
+  if (list) list.classList.remove('drag-new-subject');
 }
 
 function handleDragOver(e, nodeId) {
@@ -272,6 +274,70 @@ function moveNode(nodeId, targetParentId) {
   saveData();
   renderSidebar();
   toast('已移动「' + node.name + '」', 'info');
+}
+
+// ============================================================
+// DROP ON EMPTY AREA → NEW SUBJECT
+// ============================================================
+function handleListDragOver(e) {
+  if (e.target.closest('.tree-node')) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  e.currentTarget.classList.add('drag-new-subject');
+}
+
+function handleListDragLeave(e) {
+  e.currentTarget.classList.remove('drag-new-subject');
+}
+
+function handleListDrop(e) {
+  e.currentTarget.classList.remove('drag-new-subject');
+  if (e.target.closest('.tree-node')) return;
+  e.preventDefault();
+  var nodeId = _dragNodeId;
+  _dragNodeId = null;
+  if (!nodeId) return;
+  moveToNewSubject(nodeId);
+}
+
+function moveToNewSubject(nodeId) {
+  var node = getNode(nodeId);
+  if (!node) return;
+  var sourceSubj = getSubjectByNodeId(nodeId);
+  if (!sourceSubj) return;
+
+  // Collect node and descendants
+  var toMoveIds = [nodeId];
+  collectDescendantIds(nodeId, sourceSubj, toMoveIds);
+
+  // Remove from source subject
+  var movedNodes = [];
+  for (var i = sourceSubj.nodes.length - 1; i >= 0; i--) {
+    if (toMoveIds.indexOf(sourceSubj.nodes[i].id) !== -1) {
+      movedNodes.push(sourceSubj.nodes[i]);
+      sourceSubj.nodes.splice(i, 1);
+    }
+  }
+
+  // Ensure unique name for new subject
+  var newName = node.name;
+  var base = newName;
+  var n = 1;
+  while (getSubject(newName)) { newName = base + ' (' + (++n) + ')'; }
+
+  // Make this node the root of the new subject
+  node.parentId = null;
+  node.expanded = true;
+
+  appData.subjects.push({
+    name: newName,
+    description: '',
+    nodes: movedNodes
+  });
+
+  saveData();
+  renderSidebar();
+  toast('已创建新学科「' + newName + '」', 'success');
 }
 
 // ============================================================

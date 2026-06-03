@@ -58,28 +58,49 @@ function rebuildQuizTree() {
   appData.subjects.forEach(function (subj) {
     var root = getRootNode(subj);
     if (!root) return;
-    if (!first) html += '<div class="subject-divider" style="margin:6px 8px 4px"></div>';
+    if (!first) html += '<div class="subject-divider" style="margin:4px 8px"></div>';
     first = false;
     if (!(root.id in _quizTreeExpanded)) _quizTreeExpanded[root.id] = true;
-    // Subject label header (same style as sidebar)
-    var isExpanded = _quizTreeExpanded[root.id] === true;
-    var totalQ = countQuestionsInNode(root.id);
-    html += '<div class="subject-label" onclick="toggleQuizFolder(\'' + root.id + '\')">' +
-      '<span class="subject-arrow">' + (isExpanded ? '▼' : '▶') + '</span> ' +
-      escHtml(root.name) +
-      '<span class="tree-count">' + totalQ + '题</span>' +
-      '</div>';
-    // Render children if expanded
-    if (isExpanded) {
-      var sub = buildQuizTreeHTML(root.id, subj, 0);
-      if (!sub) {
-        html += '<div class="tree-empty" style="padding-left:22px">空文件夹</div>';
-      } else {
-        html += sub;
-      }
-    }
+    // Render root folder as tree-node + children (subjects = folders)
+    html += buildQuizNodeHTML(root, subj, 0);
   });
   container.innerHTML = html || '<div class="tree-empty">暂无题库</div>';
+}
+
+function buildQuizNodeHTML(node, subj, depth) {
+  var isFolder = node.type === 'folder';
+  var isExpanded = _quizTreeExpanded[node.id] === true;
+  var qCount = isFolder ? countQuestionsInNode(node.id) : (node.questions || []).length;
+  var isSelected = _quizSelectedNodeId === node.id;
+  var pad = 14 + depth * 18;
+
+  var html = '<div class="tree-node' + (isSelected ? ' active' : '') + (isFolder ? ' folder-node' : ' file-node') + '" style="padding-left:' + pad + 'px"' +
+    ' data-qtn-id="' + node.id + '" data-qtn-type="' + node.type + '">';
+
+  if (isFolder) {
+    html += '<span class="tree-arrow" onclick="event.stopPropagation();toggleQuizFolder(\'' + node.id + '\')">' +
+      (isExpanded ? '▼' : '▶') + '</span>';
+  } else {
+    html += '<span class="tree-arrow" style="visibility:hidden">▶</span>';
+  }
+
+  html += '<span class="tree-icon">' + (isFolder ? (isExpanded ? '📂' : '📁') : '📄') + '</span>';
+  html += '<span class="tree-name" onclick="event.stopPropagation();' +
+    (isFolder ? "toggleQuizFolder('" + node.id + "')" : "selectQuizNode('" + node.id + "')") + '">' +
+    escHtml(node.name) + '</span>';
+  html += '<span class="tree-count">' + qCount + (isFolder ? '' : '题') + '</span>';
+  html += '</div>';
+
+  // Render children if folder and expanded
+  if (isFolder && isExpanded) {
+    var sub = buildQuizTreeHTML(node.id, subj, depth + 1);
+    if (!sub) {
+      html += '<div class="tree-empty" style="padding-left:' + (14 + (depth + 1) * 18) + 'px">空文件夹</div>';
+    } else {
+      html += sub;
+    }
+  }
+  return html;
 }
 
 function buildQuizTreeHTML(nodeId, subj, depth) {

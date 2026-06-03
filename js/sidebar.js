@@ -12,37 +12,10 @@ function renderSidebar() {
     var root = getRootNode(s);
     if (!root) return;
     if (idx > 0) html += '<div class="subject-divider"></div>';
-    var collapsed = s.collapsed === true;
-    var totalQ = countQuestionsInNode(root.id);
-    html += '<div class="subject-label' + (collapsed ? ' collapsed' : '') + '" onclick="toggleSubjectCollapseIdx(' + idx + ')">' +
-      '<span class="subject-arrow">' + (collapsed ? '▶' : '▼') + '</span> ' +
-      escHtml(s.name) +
-      '<span class="tree-count">' + totalQ + '题</span>' +
-    '</div>';
-    if (!collapsed) {
-      var rootChildren = getChildrenNodes(root.id, s);
-      rootChildren.sort(function (a, b) {
-        if (a.type !== b.type) return a.type === 'folder' ? -1 : 1;
-        return a.name.localeCompare(b.name, 'zh-CN');
-      });
-      if (rootChildren.length) {
-        rootChildren.forEach(function (child) {
-          html += renderTreeNode(child, s, 0);
-        });
-      } else {
-        html += '<div class="tree-empty" style="padding-left:14px">空学科，请添加题库</div>';
-      }
-    }
+    // Root folder is a regular draggable tree-node — subjects and folders are identical
+    html += renderTreeNode(root, s, 0);
   });
   c.innerHTML = html;
-}
-
-function toggleSubjectCollapseIdx(idx) {
-  var s = appData.subjects[idx];
-  if (!s) return;
-  s.collapsed = s.collapsed === true ? false : true;
-  saveData();
-  renderSidebar();
 }
 
 function renderTreeNode(node, subject, depth) {

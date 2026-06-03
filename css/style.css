@@ -77,7 +77,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto
 .tree-node.dragging { opacity: 0.4; }
 .tree-node.drag-over { background: var(--primary-light); outline: 2px dashed var(--primary); outline-offset: -2px; }
 .tree-node.drag-invalid { background: #fef2f2; }
-#subject-list.drag-new-subject { background: var(--primary-light); outline: 2px dashed var(--primary); outline-offset: -2px; border-radius: 6px; min-height: 40px; }
+.tree-node.drag-before { box-shadow: inset 0 2px 0 0 var(--primary); }
+.tree-node.drag-after { box-shadow: inset 0 -2px 0 0 var(--primary); }
+#subject-list.drag-new-subject { outline: 2px dashed var(--primary); outline-offset: -4px; border-radius: 6px; }
 
 .sidebar-footer { padding: 10px 14px; border-top: 1px solid var(--gray-200); }
 .sidebar-footer button { width: 100%; padding: 7px; border: none; background: var(--primary); color: #fff; border-radius: 8px; cursor: pointer; font-size: 13px; transition: all .2s; }

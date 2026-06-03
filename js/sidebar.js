@@ -206,8 +206,8 @@ function handleDragStart(e, nodeId) {
 
 function handleDragEnd(e) {
   _dragNodeId = null;
-  document.querySelectorAll('.tree-node.dragging, .tree-node.drag-over, .tree-node.drag-invalid').forEach(function (el) {
-    el.classList.remove('dragging', 'drag-over', 'drag-invalid');
+  document.querySelectorAll('.tree-node.dragging, .tree-node.drag-over, .tree-node.drag-invalid, .tree-node.drag-before, .tree-node.drag-after').forEach(function (el) {
+    el.classList.remove('dragging', 'drag-over', 'drag-invalid', 'drag-before', 'drag-after');
   });
   var list = document.getElementById('subject-list');
   if (list) list.classList.remove('drag-new-subject');
@@ -217,28 +217,103 @@ function handleDragOver(e, nodeId) {
   e.preventDefault();
   e.dataTransfer.dropEffect = 'move';
   var el = e.currentTarget;
+  var isFolder = el.classList.contains('folder-node');
+
   if (!_dragNodeId || _dragNodeId === nodeId || isDescendantOf(_dragNodeId, nodeId)) {
     el.classList.add('drag-invalid');
-    el.classList.remove('drag-over');
+    el.classList.remove('drag-over', 'drag-before', 'drag-after');
     return;
   }
-  el.classList.add('drag-over');
-  el.classList.remove('drag-invalid');
+
+  // Detect position: top 25% = before, bottom 25% = after, middle = into
+  var rect = el.getBoundingClientRect();
+  var ratio = (e.clientY - rect.top) / rect.height;
+  el.classList.remove('drag-invalid', 'drag-over', 'drag-before', 'drag-after');
+
+  if (ratio < 0.25) {
+    el.classList.add('drag-before');
+  } else if (ratio > 0.75) {
+    el.classList.add('drag-after');
+  } else if (isFolder) {
+    el.classList.add('drag-over');
+  }
+  // For files in middle area: no indicator (can't drop into a file)
 }
 
 function handleDragLeave(e) {
   var el = e.currentTarget;
   if (e.relatedTarget && el.contains(e.relatedTarget)) return;
-  el.classList.remove('drag-over', 'drag-invalid');
+  el.classList.remove('drag-over', 'drag-invalid', 'drag-before', 'drag-after');
 }
 
 function handleDrop(e, targetNodeId) {
   e.preventDefault();
-  e.currentTarget.classList.remove('drag-over', 'drag-invalid');
+  var el = e.currentTarget;
+  el.classList.remove('drag-over', 'drag-invalid', 'drag-before', 'drag-after');
   var nodeId = _dragNodeId;
   _dragNodeId = null;
   if (!nodeId || nodeId === targetNodeId) return;
-  moveNode(nodeId, targetNodeId);
+
+  var rect = el.getBoundingClientRect();
+  var ratio = (e.clientY - rect.top) / rect.height;
+  var isFolder = el.classList.contains('folder-node');
+
+  if (ratio < 0.25) {
+    insertNodeBefore(nodeId, targetNodeId);
+  } else if (ratio > 0.75) {
+    insertNodeAfter(nodeId, targetNodeId);
+  } else if (isFolder) {
+    moveNode(nodeId, targetNodeId);
+  }
+  // Files in middle: do nothing
+}
+
+function insertNodeBefore(nodeId, beforeNodeId) {
+  insertNodeAt(nodeId, beforeNodeId, true);
+}
+
+function insertNodeAfter(nodeId, afterNodeId) {
+  insertNodeAt(nodeId, afterNodeId, false);
+}
+
+function insertNodeAt(nodeId, refNodeId, before) {
+  var node = getNode(nodeId);
+  var refNode = getNode(refNodeId);
+  if (!node || !refNode || nodeId === refNodeId) return;
+  if (isDescendantOf(nodeId, refNodeId)) return;
+
+  var sourceSubj = getSubjectByNodeId(nodeId);
+  var targetSubj = getSubjectByNodeId(refNodeId);
+  if (!sourceSubj || !targetSubj) return;
+
+  var toMoveIds = [nodeId];
+  collectDescendantIds(nodeId, sourceSubj, toMoveIds);
+
+  // Remove from source
+  var movedNodes = [];
+  for (var i = sourceSubj.nodes.length - 1; i >= 0; i--) {
+    if (toMoveIds.indexOf(sourceSubj.nodes[i].id) !== -1) {
+      movedNodes.push(sourceSubj.nodes[i]);
+      sourceSubj.nodes.splice(i, 1);
+    }
+  }
+
+  // Find insert position in target subject
+  var refIdx = targetSubj.nodes.indexOf(refNode);
+  if (refIdx === -1) refIdx = targetSubj.nodes.length;
+  var insertIdx = before ? refIdx : refIdx + 1;
+
+  // Insert all moved nodes at the position
+  for (var j = movedNodes.length - 1; j >= 0; j--) {
+    targetSubj.nodes.splice(insertIdx, 0, movedNodes[j]);
+  }
+
+  // Update parentId to match the reference node's parent
+  node.parentId = refNode.parentId;
+
+  saveData();
+  renderSidebar();
+  toast('已移动「' + node.name + '」', 'info');
 }
 
 function moveNode(nodeId, targetParentId) {
@@ -280,10 +355,17 @@ function moveNode(nodeId, targetParentId) {
 // DROP ON EMPTY AREA → NEW SUBJECT
 // ============================================================
 function handleListDragOver(e) {
+  // Only trigger new-subject when below all tree nodes
   if (e.target.closest('.tree-node')) return;
+  var list = e.currentTarget;
+  var last = list.querySelector('.tree-node:last-of-type');
+  if (last) {
+    var r = last.getBoundingClientRect();
+    if (e.clientY < r.bottom + 12) return;
+  }
   e.preventDefault();
   e.dataTransfer.dropEffect = 'move';
-  e.currentTarget.classList.add('drag-new-subject');
+  list.classList.add('drag-new-subject');
 }
 
 function handleListDragLeave(e) {
@@ -291,8 +373,14 @@ function handleListDragLeave(e) {
 }
 
 function handleListDrop(e) {
-  e.currentTarget.classList.remove('drag-new-subject');
+  var list = e.currentTarget;
+  list.classList.remove('drag-new-subject');
   if (e.target.closest('.tree-node')) return;
+  var last = list.querySelector('.tree-node:last-of-type');
+  if (last) {
+    var r = last.getBoundingClientRect();
+    if (e.clientY < r.bottom + 12) return;
+  }
   e.preventDefault();
   var nodeId = _dragNodeId;
   _dragNodeId = null;

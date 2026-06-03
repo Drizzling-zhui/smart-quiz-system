@@ -329,19 +329,29 @@ function moveNode(nodeId, targetParentId) {
   collectDescendantIds(nodeId, sourceSubj, toMoveIds);
 
   if (sourceSubj !== targetSubj) {
-    // Move nodes between subjects
     var movedNodes = [];
     for (var i = sourceSubj.nodes.length - 1; i >= 0; i--) {
       if (toMoveIds.indexOf(sourceSubj.nodes[i].id) !== -1) {
-        movedNodes.push(sourceSubj.nodes[i]);
+        movedNodes.unshift(sourceSubj.nodes[i]);
         sourceSubj.nodes.splice(i, 1);
       }
     }
-    targetSubj.nodes = targetSubj.nodes.concat(movedNodes);
+    for (var j = 0; j < movedNodes.length; j++) {
+      targetSubj.nodes.push(movedNodes[j]);
+    }
   }
 
   node.parentId = targetParentId;
   target.expanded = true;
+
+  if (sourceSubj !== targetSubj) {
+    var hasRoot = sourceSubj.nodes.some(function (n) { return n.parentId === null; });
+    if (!hasRoot) {
+      var idx = appData.subjects.indexOf(sourceSubj);
+      if (idx !== -1) appData.subjects.splice(idx, 1);
+    }
+  }
+
   saveData();
   renderSidebar();
   toast('已移动「' + node.name + '」', 'info');

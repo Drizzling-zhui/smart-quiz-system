@@ -331,7 +331,9 @@ function _saveExportFile(blob, fileName, b64, totalQuestions, hasApi) {
         FS = C.registerPlugin('Filesystem');
       }
       if (FS && FS.writeFile) {
-        FS.writeFile({ path: fileName, data: b64, directory: 'DOCUMENTS', recursive: true }).then(function (r) {
+        // Wrap as data URL so Capacitor writes exact binary bytes (avoid text encoding issues)
+        var dataUrl = 'data:application/octet-stream;base64,' + btoa(b64);
+        FS.writeFile({ path: fileName, data: dataUrl, directory: 'DOCUMENTS', recursive: true }).then(function (r) {
           var path = r.uri || 'Documents/' + fileName;
           _showExportModal(fileName, b64, totalQuestions, blob, path);
         }).catch(function (e) {

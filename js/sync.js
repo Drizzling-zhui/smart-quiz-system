@@ -310,67 +310,52 @@ function importEncrypted(file) {
   reader.readAsText(file);
 }
 
-// Save export file — desktop download, mobile share/save
+// Save export file — desktop auto-download + always show result modal
 function _saveExportFile(blob, fileName, b64, totalQuestions, hasApi) {
-  // Method 1: desktop browser — a.click() download
-  if (typeof window.Capacitor === 'undefined') {
+  // Desktop: trigger download immediately
+  var isCapacitor = !!(typeof window.Capacitor !== 'undefined' && window.Capacitor.getPlatform);
+  if (!isCapacitor) {
     try {
       var url = URL.createObjectURL(blob);
       var a = document.createElement('a');
       a.href = url; a.download = fileName; a.click();
-      setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
-      toast('加密导出成功（' + (hasApi ? '含API配置、' : '') + '收藏）', 'success');
-      return;
+      setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
     } catch (e) {}
   }
 
-  // Method 2: mobile — Web Share API (can share as file)
-  if (navigator.canShare && navigator.canShare({ files: [new File([blob], fileName, { type: 'application/octet-stream' })] })) {
-    navigator.share({
-      files: [new File([blob], fileName, { type: 'application/octet-stream' })],
-      title: '题库加密导出'
-    }).then(function () {
-      toast('已分享导出文件', 'success');
-    }).catch(function () {
-      // User cancelled share, show fallback
-      _showExportModal(fileName, b64, totalQuestions);
-    });
-    return;
-  }
-
-  // Method 3: mobile — try opening blob URL (triggers download in some browsers)
-  try {
-    var blobUrl = URL.createObjectURL(blob);
-    var w = window.open(blobUrl, '_blank');
-    if (w) {
-      setTimeout(function () { URL.revokeObjectURL(blobUrl); }, 3000);
-      toast('文件已保存到下载目录', 'success');
-      return;
-    }
-  } catch (e) {}
-
-  // Method 4: fallback — show text for manual copy
-  _showExportModal(fileName, b64, totalQuestions);
+  // Always show modal with share + copy options (mobile needs this)
+  _showExportModal(fileName, b64, totalQuestions, blob);
 }
 
-function _showExportModal(fileName, content, totalQuestions) {
+function _showExportModal(fileName, content, totalQuestions, blob) {
   var existing = document.getElementById('modal-export-result');
   if (existing) existing.remove();
 
   var overlay = document.createElement('div');
   overlay.className = 'modal-overlay active';
   overlay.id = 'modal-export-result';
+
+  var shareBtn = '';
+  if (navigator.share) {
+    shareBtn = '<button class="btn-primary" onclick="var f=new File([document._exportBlob],\'' + fileName + '\',{type:\'application/octet-stream\'});navigator.share({files:[f],title:\'题库加密导出\'}).then(function(){toast(\'已分享\',\'success\')}).catch(function(){})">📤 分享文件</button>';
+  }
+
   overlay.innerHTML = '<div class="modal" style="max-width:520px">' +
     '<h3>📤 加密导出成功</h3>' +
     '<p style="font-size:12px;color:var(--gray-500);margin-bottom:8px">' + totalQuestions + '题，文件：' + fileName + '</p>' +
-    '<p style="font-size:11px;color:var(--warning);margin-bottom:8px">⚠️ 如未自动保存，请复制内容粘贴到备忘录，保存为 <code>' + fileName + '</code></p>' +
-    '<textarea readonly rows="6" style="width:100%;font-size:11px;font-family:monospace;padding:8px;border:1px solid var(--gray-300);border-radius:6px;resize:vertical;word-break:break-all" onclick="this.select()">' + content + '</textarea>' +
-    '<div class="modal-actions" style="margin-top:10px">' +
-      '<button class="btn-primary" onclick="navigator.clipboard.writeText(document.querySelector(\'#modal-export-result textarea\').value);toast(\'已复制到剪贴板\',\'success\')">📋 复制</button>' +
+    '<p style="font-size:11px;color:var(--gray-500);margin-bottom:8px">点击「分享文件」可保存到文件或发送到微信；或复制内容手动保存</p>' +
+    '<textarea readonly rows="5" style="width:100%;font-size:11px;font-family:monospace;padding:8px;border:1px solid var(--gray-300);border-radius:6px;resize:vertical;word-break:break-all" onclick="this.select()">' + content + '</textarea>' +
+    '<div class="modal-actions" style="margin-top:10px;flex-wrap:wrap;gap:6px">' +
+      shareBtn +
+      '<button class="btn-outline" onclick="var ta=document.querySelector(\'#modal-export-result textarea\');ta.select();navigator.clipboard.writeText(ta.value);toast(\'已复制\',\'success\')">📋 复制内容</button>' +
       '<button class="btn-cancel" onclick="document.getElementById(\'modal-export-result\').remove()">关闭</button>' +
     '</div>' +
     '</div>';
   document.body.appendChild(overlay);
+
+  // Store blob for share button
+  document._exportBlob = blob;
+
   overlay.addEventListener('click', function (e) {
     if (e.target === overlay) overlay.remove();
   });

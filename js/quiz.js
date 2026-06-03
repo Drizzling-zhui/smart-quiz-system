@@ -11,15 +11,11 @@ var quizState = {
 var quizTypeFilter = new Set(['all', 'choice', 'multi', 'judge', 'fill', 'short']);
 
 function updateQuizSetup() {
-  var subjName = document.getElementById('quiz-subject-select').value;
-  var subj = getSubject(subjName);
+  var selNodeId = document.getElementById('quiz-node-select').value;
+  var subj = selNodeId ? getSubjectByNodeId(selNodeId) : null;
   var avail = document.getElementById('quiz-avail-count');
-  if (subj) {
-    var selNodeId = document.getElementById('quiz-node-select').value;
-    var pool = [];
-    if (selNodeId) {
-      pool = getAllQuestionsFromNode(selNodeId);
-    }
+  if (subj && selNodeId) {
+    var pool = getAllQuestionsFromNode(selNodeId);
     if (!quizTypeFilter.has('all')) pool = pool.filter(function (q) { return quizTypeFilter.has(q.type); });
     if (quizState.mode === 'wrong') {
       var wrongPool = pool.filter(function (q) { return q.stats && q.stats.wrong > 0; });
@@ -33,29 +29,164 @@ function updateQuizSetup() {
   } else avail.textContent = '';
 }
 
-function buildQuizNodeSelect(subj) {
-  if (!subj) return '<option value="">— 请选择题库 —</option>';
-  var options = '';
-  function walk(nodeId, depth, nodes) {
-    getChildrenNodes(nodeId, subj).forEach(function (n) {
-      if (n.type === 'file') {
-        var qCount = (n.questions || []).length;
-        options += '<option value="' + n.id + '"' + (currentNodeId === n.id ? ' selected' : '') + '>' +
-          '│  '.repeat(depth) + '📄 ' + escHtml(n.name) + '（' + qCount + '题）</option>';
-      } else if (n.type === 'folder') {
-        options += '<option value="' + n.id + '" style="font-weight:600">' +
-          '│  '.repeat(depth) + '📁 ' + escHtml(n.name) + '</option>';
-        walk(n.id, depth + 1, nodes);
-      }
-    });
+// Quiz dropdown tree
+var _quizTreeExpanded = {};
+var _quizSelectedNodeId = '';
+var _quizDropdownOpen = false;
+
+function renderQuizTree() {
+  _quizTreeExpanded = {};
+  _quizSelectedNodeId = '';
+  var hidden = document.getElementById('quiz-node-select');
+  if (hidden) hidden.value = '';
+  var display = document.getElementById('quiz-tree-display-text');
+  if (display) { display.textContent = '— 请选择题库 —'; display.classList.add('placeholder'); }
+  var icon = document.getElementById('quiz-tree-display-icon');
+  if (icon) icon.textContent = '📁';
+  rebuildQuizTree();
+}
+
+function rebuildQuizTree() {
+  var container = document.getElementById('quiz-tree-scroll');
+  if (!container) return;
+  if (!appData.subjects.length) {
+    container.innerHTML = '<div class="tree-empty">暂无学科，请先添加学科</div>';
+    return;
   }
-  var root = getRootNode(subj);
-  if (root) {
+  var html = '';
+  var first = true;
+  appData.subjects.forEach(function (subj) {
+    var root = getRootNode(subj);
+    if (!root) return;
+    if (!first) html += '<div class="subject-divider" style="margin:4px 8px"></div>';
+    first = false;
+    if (!(root.id in _quizTreeExpanded)) _quizTreeExpanded[root.id] = true;
+    // Render subject root node itself
+    var isExpanded = _quizTreeExpanded[root.id] === true;
     var totalQ = countQuestionsInNode(root.id);
-    options += '<option value="' + root.id + '">📁 ' + escHtml(subj.name) + '（全部，' + totalQ + '题）</option>';
-    walk(root.id, 0, subj.nodes);
+    html += '<div class="tree-node folder-node" style="padding-left:14px">';
+    html += '<span class="tree-arrow" onclick="event.stopPropagation();toggleQuizFolder(\'' + root.id + '\')">' +
+      (isExpanded ? '▼' : '▶') + '</span>';
+    html += '<span class="tree-icon">' + (isExpanded ? '📂' : '📁') + '</span>';
+    html += '<span class="tree-name" onclick="event.stopPropagation();toggleQuizFolder(\'' + root.id + '\')">' +
+      escHtml(root.name) + '</span>';
+    html += '<span class="tree-count">' + totalQ + '</span>';
+    html += '</div>';
+    // Render children if expanded
+    if (isExpanded) {
+      var sub = buildQuizTreeHTML(root.id, subj, 1);
+      if (!sub) {
+        html += '<div class="tree-empty" style="padding-left:46px">空文件夹</div>';
+      } else {
+        html += sub;
+      }
+    }
+  });
+  container.innerHTML = html || '<div class="tree-empty">暂无题库</div>';
+}
+
+function buildQuizTreeHTML(nodeId, subj, depth) {
+  var children = getChildrenNodes(nodeId, subj);
+  children.sort(function (a, b) {
+    if (a.type !== b.type) return a.type === 'folder' ? -1 : 1;
+    return a.name.localeCompare(b.name, 'zh-CN');
+  });
+
+  var html = '';
+  children.forEach(function (n) {
+    var isFolder = n.type === 'folder';
+    var isExpanded = _quizTreeExpanded[n.id] === true;
+    var qCount = isFolder ? countQuestionsInNode(n.id) : (n.questions || []).length;
+    var isSelected = _quizSelectedNodeId === n.id;
+    var pad = 14 + depth * 18;
+
+    html += '<div class="tree-node' + (isSelected ? ' active' : '') + (isFolder ? ' folder-node' : ' file-node') + '" style="padding-left:' + pad + 'px"' +
+      ' data-qtn-id="' + n.id + '" data-qtn-type="' + n.type + '">';
+
+    if (isFolder) {
+      html += '<span class="tree-arrow" onclick="event.stopPropagation();toggleQuizFolder(\'' + n.id + '\')">' +
+        (isExpanded ? '▼' : '▶') + '</span>';
+    } else {
+      html += '<span class="tree-arrow" style="visibility:hidden">▶</span>';
+    }
+
+    html += '<span class="tree-icon">' + (isFolder ? (isExpanded ? '📂' : '📁') : '📄') + '</span>';
+
+    html += '<span class="tree-name" onclick="event.stopPropagation();' +
+      (isFolder ? "toggleQuizFolder('" + n.id + "')" : "selectQuizNode('" + n.id + "')") + '">' +
+      escHtml(n.name) + '</span>';
+
+    html += '<span class="tree-count">' + qCount + (isFolder ? '' : '题') + '</span>';
+
+    html += '</div>';
+
+    if (isFolder && isExpanded) {
+      var sub = buildQuizTreeHTML(n.id, subj, depth + 1);
+      if (!sub) {
+        html += '<div class="tree-empty" style="padding-left:' + (14 + (depth + 1) * 18) + 'px">空文件夹</div>';
+      } else {
+        html += sub;
+      }
+    }
+  });
+  return html;
+}
+
+function toggleQuizFolder(nodeId) {
+  _quizTreeExpanded[nodeId] = !_quizTreeExpanded[nodeId];
+  rebuildQuizTree();
+}
+
+function selectQuizNode(nodeId) {
+  _quizSelectedNodeId = nodeId;
+  var hidden = document.getElementById('quiz-node-select');
+  if (hidden) hidden.value = nodeId;
+  var node = getNode(nodeId);
+  if (node) {
+    var display = document.getElementById('quiz-tree-display-text');
+    if (display) { display.textContent = node.name; display.classList.remove('placeholder'); }
+    var icon = document.getElementById('quiz-tree-display-icon');
+    if (icon) icon.textContent = node.type === 'folder' ? '📁' : '📄';
   }
-  return options;
+  expandQuizPath(nodeId);
+  rebuildQuizTree();
+  closeQuizDropdown();
+  updateQuizSetup();
+}
+
+function expandQuizPath(nodeId) {
+  var node = getNode(nodeId);
+  while (node && node.parentId) {
+    _quizTreeExpanded[node.parentId] = true;
+    node = getNode(node.parentId);
+  }
+}
+
+function toggleQuizDropdown() {
+  _quizDropdownOpen = !_quizDropdownOpen;
+  var dd = document.getElementById('quiz-tree-dropdown');
+  var display = document.getElementById('quiz-tree-display');
+  var backdrop = document.getElementById('quiz-dropdown-backdrop');
+  if (_quizDropdownOpen) {
+    dd.classList.remove('hidden');
+    display.classList.add('open');
+    if (backdrop) backdrop.classList.add('open');
+  } else {
+    dd.classList.add('hidden');
+    display.classList.remove('open');
+    if (backdrop) backdrop.classList.remove('open');
+  }
+}
+
+function closeQuizDropdown() {
+  if (!_quizDropdownOpen) return;
+  _quizDropdownOpen = false;
+  var dd = document.getElementById('quiz-tree-dropdown');
+  if (dd) dd.classList.add('hidden');
+  var display = document.getElementById('quiz-tree-display');
+  if (display) display.classList.remove('open');
+  var backdrop = document.getElementById('quiz-dropdown-backdrop');
+  if (backdrop) backdrop.classList.remove('open');
 }
 
 function toggleQuizType(type, el) {
@@ -106,16 +237,9 @@ function renderQuizSetup() {
   document.getElementById('quiz-setup').style.display = 'block';
   document.getElementById('quiz-playing').style.display = 'none';
   document.getElementById('quiz-result-area').style.display = 'none';
-  var sel = document.getElementById('quiz-subject-select');
-  sel.innerHTML = appData.subjects.map(function (s) {
-    return '<option value="' + escHtml(s.name) + '" ' + (s.name === currentSubject ? 'selected' : '') + '>' + escHtml(s.name) + '</option>';
-  }).join('');
-  if (!appData.subjects.length) sel.innerHTML = '<option value="">— 暂无学科 —</option>';
 
-  // Build node selector
-  var nodeSel = document.getElementById('quiz-node-select');
-  var curSubj = getSubject(document.getElementById('quiz-subject-select').value);
-  nodeSel.innerHTML = buildQuizNodeSelect(curSubj);
+  // Build quiz tree (all subjects)
+  renderQuizTree();
 
   if (quizTypeFilter.size === 0 || quizTypeFilter.has('all')) {
     document.querySelectorAll('.qtc').forEach(function (b) { b.classList.add('active'); });
@@ -131,12 +255,11 @@ function renderQuizSetup() {
 }
 
 function startQuiz() {
-  var subjName = document.getElementById('quiz-subject-select').value;
   var nodeId = document.getElementById('quiz-node-select').value;
   var count = parseInt(document.getElementById('quiz-count').value) || 0;
-  if (!subjName || !nodeId) return toast('请选择学科和题库', 'warning');
-  var subj = getSubject(subjName);
-  if (!subj) return toast('该学科不存在', 'warning');
+  if (!nodeId) return toast('请选择题库', 'warning');
+  var subj = getSubjectByNodeId(nodeId);
+  if (!subj) return toast('该题库不存在', 'warning');
 
   var pool = getAllQuestionsFromNode(nodeId);
   if (!pool.length) return toast('所选题库暂无题目', 'warning');

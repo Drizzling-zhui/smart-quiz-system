@@ -182,6 +182,37 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto
 .setup-form .start-btn:hover { background: var(--primary-dark); }
 .setup-form .start-btn:disabled { opacity: .5; cursor: not-allowed; }
 
+/* Quiz dropdown tree selector */
+.quiz-tree-select { position: relative; }
+.quiz-tree-display {
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 10px; border: 1px solid var(--gray-300); border-radius: 6px;
+  font-size: 13px; cursor: pointer; background: #fff; min-height: 36px;
+  transition: border-color .2s, box-shadow .2s; user-select: none;
+}
+.quiz-tree-display:hover { border-color: var(--primary); }
+.quiz-tree-display.open { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(79,110,247,.15); position: relative; z-index: 51; }
+.quiz-tree-display-icon { flex-shrink: 0; font-size: 14px; }
+.quiz-tree-display-text { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--gray-700); min-width: 0; }
+.quiz-tree-display-text.placeholder { color: var(--gray-400); }
+.quiz-tree-display-arrow { font-size: 9px; color: var(--gray-400); flex-shrink: 0; transition: transform .2s; }
+.quiz-tree-display.open .quiz-tree-display-arrow { transform: rotate(180deg); }
+
+.quiz-dropdown-backdrop { display: none; position: fixed; inset: 0; z-index: 48; }
+.quiz-dropdown-backdrop.open { display: block; }
+
+.quiz-tree-dropdown {
+  position: absolute; top: calc(100% + 4px); left: 0; min-width: 300px;
+  background: #fff; border: 1px solid var(--gray-200); border-radius: 8px;
+  box-shadow: var(--shadow-lg); z-index: 50; max-height: 60vh;
+  overflow: hidden; display: flex; flex-direction: column;
+}
+.quiz-tree-dropdown.hidden { display: none; }
+
+.quiz-tree-scroll { overflow-y: auto; padding: 4px; }
+.quiz-tree-scroll .tree-node { border-radius: 6px; margin: 1px 0; }
+.quiz-tree-scroll .tree-empty { font-size: 12px; color: var(--gray-400); padding: 16px; text-align: center; }
+
 /* Quiz playing */
 .quiz-progress { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
 .quiz-progress .bar-wrap { flex: 1; height: 5px; background: var(--gray-200); border-radius: 3px; overflow: hidden; }
@@ -443,7 +474,46 @@ body.resizing .chat-resize-handle { background: rgba(79,110,247,.25); }
 .chat-msg.streaming { border-left: 2px solid var(--primary); animation: streamPulse 1.5s ease-in-out infinite; }
 @keyframes streamPulse { 0%,100% { border-left-color: var(--primary); } 50% { border-left-color: var(--primary-light); } }
 
-@media (max-width: 768px) { #sidebar { width: 280px; min-width: 280px; } #content { padding: 12px; } #chat-panel.open { width: 260px !important; } }
+/* ===== Responsive ===== */
+/* Phone */
+@media (max-width: 768px) {
+  #sidebar { width: 280px; min-width: 280px; }
+  #content { padding: 10px; }
+  #chat-panel.open { width: 260px !important; }
+  .setup-form { max-width: 100%; padding: 16px; }
+  .setup-form .mode-select { flex-direction: column; gap: 6px; }
+  .setup-form .field select, .setup-form .field input { width: 100%; }
+  .quiz-tree-select { width: 100%; }
+  .quiz-tree-dropdown { position: fixed; top: auto; bottom: 0; left: 0; right: 0; max-height: 55vh; border-radius: 12px 12px 0 0; min-width: auto; }
+  #topbar { padding: 0 8px; }
+  .tab-btn { padding: 10px 12px; font-size: 12px; }
+  .view-header { flex-direction: column; align-items: flex-start; }
+  .view-header .actions { width: 100%; flex-wrap: wrap; }
+  .modal { width: 95%; padding: 16px; }
+}
+
+/* Phone (narrow) */
+@media (max-width: 480px) {
+  #content { padding: 8px; }
+  .setup-form { padding: 12px; }
+  .quiz-card { padding: 12px 14px; }
+  .quiz-card .q-text { font-size: 14px; }
+  .quiz-result .detail { flex-wrap: wrap; }
+  .quiz-result .detail .stat { min-width: 40%; }
+  .q-card { padding: 10px 14px; }
+}
+
+/* Tablet Portrait */
+@media (min-width: 769px) and (max-width: 1024px) {
+  #content { padding: 16px 24px; }
+  .setup-form { max-width: 460px; }
+  .quiz-setup { padding: 28px 16px; }
+}
+
+/* Desktop / Tablet Landscape */
+@media (min-width: 1025px) {
+  .setup-form { max-width: 500px; }
+}
 
 /* Quiz type selector in setup */
 .qtype-checks { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }

@@ -71,12 +71,18 @@
             <p>选择学科和答题模式，开始训练</p>
             <div class="setup-form">
               <div class="field">
-                <label>选择学科</label>
-                <select id="quiz-subject-select" onchange="renderQuizSetup()"><option value="">— 暂无学科 —</option></select>
-              </div>
-              <div class="field">
                 <label>选择题库</label>
-                <select id="quiz-node-select" onchange="updateQuizSetup()"><option value="">— 请选择题库 —</option></select>
+                <div class="quiz-tree-select" id="quiz-tree-select">
+                  <div class="quiz-tree-display" id="quiz-tree-display" onclick="toggleQuizDropdown()">
+                    <span class="quiz-tree-display-icon">📁</span>
+                    <span class="quiz-tree-display-text placeholder" id="quiz-tree-display-text">— 请选择题库 —</span>
+                    <span class="quiz-tree-display-arrow">▼</span>
+                  </div>
+                  <div class="quiz-tree-dropdown hidden" id="quiz-tree-dropdown">
+                    <div class="quiz-tree-scroll" id="quiz-tree-scroll"></div>
+                  </div>
+                </div>
+                <input type="hidden" id="quiz-node-select" value="">
               </div>
               <div class="field">
                 <label>题目类型</label>
@@ -316,6 +322,9 @@
 </div>
 
 <div class="toast-container" id="toast-container"></div>
+
+<!-- Quiz tree dropdown backdrop -->
+<div class="quiz-dropdown-backdrop" id="quiz-dropdown-backdrop" onclick="closeQuizDropdown()"></div>
 
 <!-- API Config Prompt (shown when API not configured) -->
 <div class="banner-overlay" id="banner-api">

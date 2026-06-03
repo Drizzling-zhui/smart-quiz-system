@@ -25,9 +25,8 @@ function renderTreeNode(node, subject, depth) {
   var isExpanded = node.expanded !== false;
   var qCount = isFolder ? countQuestionsInNode(node.id) : (node.questions || []).length;
 
-  var isRoot = node.parentId === null;
   var html = '<div class="tree-node' + (isSelected ? ' active' : '') + (isFolder ? ' folder-node' : ' file-node') + '" style="padding-left:' + pad + 'px" data-node-id="' + node.id + '"' +
-    (isRoot ? '' : ' draggable="true" ondragstart="handleDragStart(event,\'' + node.id + '\')" ondragend="handleDragEnd(event)"') +
+    ' draggable="true" ondragstart="handleDragStart(event,\'' + node.id + '\')" ondragend="handleDragEnd(event)"' +
     (isFolder ? ' ondragover="handleDragOver(event,\'' + node.id + '\')" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event,\'' + node.id + '\')"' : '') +
     '>';
 
@@ -247,8 +246,6 @@ function moveNode(nodeId, targetParentId) {
   if (target.type !== 'folder') return;
   if (node.parentId === targetParentId) return;
   if (isDescendantOf(nodeId, targetParentId)) return;
-  // Don't allow moving root nodes
-  if (node.parentId === null) return;
 
   var sourceSubj = getSubjectByNodeId(nodeId);
   var targetSubj = getSubjectByNodeId(targetParentId);

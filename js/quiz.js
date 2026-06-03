@@ -58,25 +58,22 @@ function rebuildQuizTree() {
   appData.subjects.forEach(function (subj) {
     var root = getRootNode(subj);
     if (!root) return;
-    if (!first) html += '<div class="subject-divider" style="margin:4px 8px"></div>';
+    if (!first) html += '<div class="subject-divider" style="margin:6px 8px 4px"></div>';
     first = false;
     if (!(root.id in _quizTreeExpanded)) _quizTreeExpanded[root.id] = true;
-    // Render subject root node itself
+    // Subject label header (same style as sidebar)
     var isExpanded = _quizTreeExpanded[root.id] === true;
     var totalQ = countQuestionsInNode(root.id);
-    html += '<div class="tree-node folder-node" style="padding-left:14px">';
-    html += '<span class="tree-arrow" onclick="event.stopPropagation();toggleQuizFolder(\'' + root.id + '\')">' +
-      (isExpanded ? '▼' : '▶') + '</span>';
-    html += '<span class="tree-icon">' + (isExpanded ? '📂' : '📁') + '</span>';
-    html += '<span class="tree-name" onclick="event.stopPropagation();toggleQuizFolder(\'' + root.id + '\')">' +
-      escHtml(root.name) + '</span>';
-    html += '<span class="tree-count">' + totalQ + '</span>';
-    html += '</div>';
+    html += '<div class="subject-label" onclick="toggleQuizFolder(\'' + root.id + '\')">' +
+      '<span class="subject-arrow">' + (isExpanded ? '▼' : '▶') + '</span> ' +
+      escHtml(root.name) +
+      '<span class="tree-count">' + totalQ + '题</span>' +
+      '</div>';
     // Render children if expanded
     if (isExpanded) {
-      var sub = buildQuizTreeHTML(root.id, subj, 1);
+      var sub = buildQuizTreeHTML(root.id, subj, 0);
       if (!sub) {
-        html += '<div class="tree-empty" style="padding-left:46px">空文件夹</div>';
+        html += '<div class="tree-empty" style="padding-left:22px">空文件夹</div>';
       } else {
         html += sub;
       }

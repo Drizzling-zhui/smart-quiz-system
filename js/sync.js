@@ -310,55 +310,91 @@ function importEncrypted(file) {
   reader.readAsText(file);
 }
 
-// Save export file — desktop auto-download + always show result modal
+// Save export file — Capacitor native write on mobile, download on desktop
 function _saveExportFile(blob, fileName, b64, totalQuestions, hasApi) {
-  // Desktop: trigger download immediately
-  var isCapacitor = !!(typeof window.Capacitor !== 'undefined' && window.Capacitor.getPlatform);
-  if (!isCapacitor) {
-    try {
-      var url = URL.createObjectURL(blob);
-      var a = document.createElement('a');
-      a.href = url; a.download = fileName; a.click();
-      setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
-    } catch (e) {}
+  // Try Capacitor Filesystem (mobile/APK)
+  var FS = null;
+  try {
+    if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem) {
+      FS = window.Capacitor.Plugins.Filesystem;
+    }
+  } catch (e) {}
+
+  if (FS && FS.writeFile) {
+    // Write to app documents directory
+    FS.writeFile({
+      path: fileName,
+      data: b64,
+      directory: 4, // Documents directory
+      recursive: true
+    }).then(function (result) {
+      toast('文件已保存：' + (result.uri || 'Documents/' + fileName), 'success');
+      // Show modal with path
+      _showExportOK(fileName, result.uri || '', totalQuestions);
+    }).catch(function () {
+      // Fallback: try ExternalStorage
+      FS.writeFile({
+        path: 'Download/' + fileName,
+        data: b64,
+        directory: 5, // ExternalStorage
+        recursive: true
+      }).then(function (result) {
+        toast('文件已保存到下载目录', 'success');
+        _showExportOK(fileName, result.uri || 'Download/' + fileName, totalQuestions);
+      }).catch(function () {
+        // Last resort: copy to clipboard
+        _showExportFallback(fileName, b64, totalQuestions);
+      });
+    });
+    return;
   }
 
-  // Always show modal with share + copy options (mobile needs this)
-  _showExportModal(fileName, b64, totalQuestions, blob);
+  // Desktop browser: download via blob URL
+  try {
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = fileName; a.click();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
+    toast('已下载 ' + fileName, 'success');
+  } catch (e) {
+    _showExportFallback(fileName, b64, totalQuestions);
+  }
 }
 
-function _showExportModal(fileName, content, totalQuestions, blob) {
+function _showExportOK(fileName, path, totalQuestions) {
   var existing = document.getElementById('modal-export-result');
   if (existing) existing.remove();
-
   var overlay = document.createElement('div');
   overlay.className = 'modal-overlay active';
   overlay.id = 'modal-export-result';
-
-  var shareBtn = '';
-  if (navigator.share) {
-    shareBtn = '<button class="btn-primary" onclick="var f=new File([document._exportBlob],\'' + fileName + '\',{type:\'application/octet-stream\'});navigator.share({files:[f],title:\'题库加密导出\'}).then(function(){toast(\'已分享\',\'success\')}).catch(function(){})">📤 分享文件</button>';
-  }
-
-  overlay.innerHTML = '<div class="modal" style="max-width:520px">' +
-    '<h3>📤 加密导出成功</h3>' +
-    '<p style="font-size:12px;color:var(--gray-500);margin-bottom:8px">' + totalQuestions + '题，文件：' + fileName + '</p>' +
-    '<p style="font-size:11px;color:var(--gray-500);margin-bottom:8px">点击「分享文件」可保存到文件或发送到微信；或复制内容手动保存</p>' +
-    '<textarea readonly rows="5" style="width:100%;font-size:11px;font-family:monospace;padding:8px;border:1px solid var(--gray-300);border-radius:6px;resize:vertical;word-break:break-all" onclick="this.select()">' + content + '</textarea>' +
-    '<div class="modal-actions" style="margin-top:10px;flex-wrap:wrap;gap:6px">' +
-      shareBtn +
-      '<button class="btn-outline" onclick="var ta=document.querySelector(\'#modal-export-result textarea\');ta.select();navigator.clipboard.writeText(ta.value);toast(\'已复制\',\'success\')">📋 复制内容</button>' +
-      '<button class="btn-cancel" onclick="document.getElementById(\'modal-export-result\').remove()">关闭</button>' +
-    '</div>' +
-    '</div>';
+  overlay.innerHTML = '<div class="modal" style="max-width:420px;text-align:center">' +
+    '<h3>📤 导出成功</h3>' +
+    '<p style="font-size:13px;color:var(--gray-700);margin:8px 0">' + totalQuestions + '题已加密导出</p>' +
+    '<p style="font-size:12px;color:var(--gray-500);">文件：' + fileName + '</p>' +
+    (path ? '<p style="font-size:11px;color:var(--primary);margin-top:4px;word-break:break-all">' + path + '</p>' : '') +
+    '<div class="modal-actions" style="justify-content:center;margin-top:12px">' +
+      '<button class="btn-primary" onclick="document.getElementById(\'modal-export-result\').remove()">确定</button>' +
+    '</div></div>';
   document.body.appendChild(overlay);
+  overlay.addEventListener('click', function (e) { if (e.target === overlay) overlay.remove(); });
+}
 
-  // Store blob for share button
-  document._exportBlob = blob;
-
-  overlay.addEventListener('click', function (e) {
-    if (e.target === overlay) overlay.remove();
-  });
+function _showExportFallback(fileName, content, totalQuestions) {
+  var existing = document.getElementById('modal-export-result');
+  if (existing) existing.remove();
+  var overlay = document.createElement('div');
+  overlay.className = 'modal-overlay active';
+  overlay.id = 'modal-export-result';
+  overlay.innerHTML = '<div class="modal" style="max-width:500px">' +
+    '<h3>📤 加密导出成功</h3>' +
+    '<p style="font-size:12px;color:var(--gray-500);margin-bottom:8px">' + totalQuestions + '题，请复制内容保存为 <code>' + fileName + '</code></p>' +
+    '<textarea readonly rows="4" style="width:100%;font-size:11px;font-family:monospace;padding:8px;border:1px solid var(--gray-300);border-radius:6px;word-break:break-all" onclick="this.select()">' + content + '</textarea>' +
+    '<div class="modal-actions" style="margin-top:8px">' +
+      '<button class="btn-primary" onclick="var t=document.querySelector(\'#modal-export-result textarea\');t.select();navigator.clipboard.writeText(t.value);toast(\'已复制\',\'success\')">📋 复制</button>' +
+      '<button class="btn-cancel" onclick="document.getElementById(\'modal-export-result\').remove()">关闭</button>' +
+    '</div></div>';
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', function (e) { if (e.target === overlay) overlay.remove(); });
 }
 
 // Clear password field on settings close

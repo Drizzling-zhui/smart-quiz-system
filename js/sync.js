@@ -334,21 +334,13 @@ function _showExportModal(fileName, content, totalQuestions, blob) {
   overlay.innerHTML = '<div class="modal" style="max-width:440px">' +
     '<h3>📤 加密导出成功</h3>' +
     '<p style="font-size:13px;color:var(--gray-700);margin:8px 0">' + totalQuestions + '题 · ' + fileName + '</p>' +
-    (navigator.share ?
-      '<p style="font-size:12px;color:var(--gray-500);margin-bottom:10px">点击「分享文件」保存到本地或发送到微信</p>' +
-      '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
-        '<button class="btn-primary" id="btn-export-share">📤 分享文件</button>' +
-        '<button class="btn-outline" id="btn-export-copy">📋 复制内容</button>' +
-        '<button class="btn-cancel" id="btn-export-close">关闭</button>' +
-      '</div>'
-    :
-      '<p style="font-size:12px;color:var(--gray-500);margin-bottom:10px">请复制下方内容，保存为 <code>' + fileName + '</code></p>' +
-      '<textarea readonly rows="4" style="width:100%;font-size:11px;font-family:monospace;padding:8px;border:1px solid var(--gray-300);border-radius:6px;word-break:break-all" onclick="this.select()">' + content + '</textarea>' +
-      '<div class="modal-actions" style="margin-top:8px">' +
-        '<button class="btn-primary" id="btn-export-copy">📋 复制</button>' +
-        '<button class="btn-cancel" id="btn-export-close">关闭</button>' +
-      '</div>'
-    ) +
+    '<p style="font-size:12px;color:var(--gray-500);margin-bottom:6px">点击「分享文件」保存到本地或发送到微信</p>' +
+    '<textarea readonly rows="4" style="width:100%;font-size:11px;font-family:monospace;padding:8px;border:1px solid var(--gray-300);border-radius:6px;word-break:break-all;margin-bottom:8px" onclick="this.select()">' + content + '</textarea>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+      '<button class="btn-primary" id="btn-export-share">📤 分享文件</button>' +
+      '<button class="btn-outline" id="btn-export-copy">📋 复制内容</button>' +
+      '<button class="btn-cancel" id="btn-export-close">关闭</button>' +
+    '</div>' +
     '</div>';
   document.body.appendChild(overlay);
 
@@ -376,10 +368,18 @@ function _showExportModal(fileName, content, totalQuestions, blob) {
   if (shareBtn) {
     shareBtn.onclick = function () {
       var file = new File([blob], fileName, { type: 'application/octet-stream' });
+      // Try file share first, fallback to text share
+      var doShare = function (data) {
+        navigator.share(data).catch(function () {
+          toast('分享失败，请用复制按钮', 'warning');
+        });
+      };
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        navigator.share({ files: [file], title: '题库加密导出' }).catch(function () {});
+        doShare({ files: [file], title: '题库加密导出' });
+      } else if (navigator.share) {
+        doShare({ text: content, title: '题库加密导出' });
       } else {
-        navigator.share({ text: content, title: '题库加密导出' }).catch(function () {});
+        toast('当前环境不支持分享，请用复制按钮', 'warning');
       }
     };
   }

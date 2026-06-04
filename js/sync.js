@@ -217,9 +217,10 @@ function importEncrypted(file) {
         }
       });
 
+      var deletedQuestions = 0, deletedNodes = 0;
+
       function mergeNodes(localSubj, inSubj) {
         if (!inSubj.nodes) return;
-        // Build a lookup of local nodes by path (name + parent name)
         function nodePath(n, subj) {
           var parts = [n.name];
           var current = n;
@@ -232,6 +233,19 @@ function importEncrypted(file) {
           return parts.join('/');
         }
 
+        // Delete local nodes not in incoming data
+        var inPaths = {};
+        (inSubj.nodes || []).forEach(function (n) { inPaths[nodePath(n, inSubj)] = true; });
+        for (var i = localSubj.nodes.length - 1; i >= 0; i--) {
+          var p = nodePath(localSubj.nodes[i], localSubj);
+          if (!inPaths[p]) {
+            var removed = localSubj.nodes[i];
+            if (removed.type === 'file' && removed.questions) deletedQuestions += removed.questions.length;
+            localSubj.nodes.splice(i, 1);
+            deletedNodes++;
+          }
+        }
+
         var localPaths = {};
         (localSubj.nodes || []).forEach(function (n) {
           localPaths[nodePath(n, localSubj)] = n;
@@ -241,31 +255,44 @@ function importEncrypted(file) {
           var path = nodePath(inNode, inSubj);
           var localNode = localPaths[path];
           if (localNode && localNode.type === 'file' && inNode.type === 'file') {
-            // Merge questions by ID
+            // Build ID maps for both sides
             var localQMap = {};
             (localNode.questions || []).forEach(function (q) { localQMap[q.id] = q; });
+            var inQMap = {};
+            (inNode.questions || []).forEach(function (q) { inQMap[q.id] = q; });
+
+            // Delete local questions not in incoming
+            var beforeDel = localNode.questions.length;
+            localNode.questions = localNode.questions.filter(function (q) { return inQMap[q.id]; });
+            deletedQuestions += beforeDel - localNode.questions.length;
+
+            // Add new + update existing
             (inNode.questions || []).forEach(function (inQ) {
-              if (localQMap[inQ.id]) {
-                // Update existing question (preserve local stats if newer)
-                var localQ = localQMap[inQ.id];
+              var localQ = localQMap[inQ.id];
+              if (localQ) {
+                // Update fields from incoming, merge stats (take newer: more attempts = newer)
                 localQ.question = inQ.question;
                 localQ.answer = inQ.answer;
                 localQ.options = inQ.options;
                 localQ.type = inQ.type;
                 if (inQ.explanation) localQ.explanation = inQ.explanation;
+                if (inQ.note) localQ.note = inQ.note;
+                // Merge stats: use whichever has more attempts (newer data)
+                var inStats = inQ.stats || { attempts: 0, correct: 0, wrong: 0 };
+                var localStats = localQ.stats || { attempts: 0, correct: 0, wrong: 0 };
+                if (inStats.attempts > localStats.attempts) {
+                  localQ.stats = inStats;
+                }
                 updatedQuestions++;
               } else {
-                // New question
                 localNode.questions.push(inQ);
                 newQuestions++;
               }
             });
           } else if (!localNode) {
-            // New node (folder or file)
             localSubj.nodes.push(inNode);
             if (inNode.type === 'file' && inNode.questions) newQuestions += inNode.questions.length;
           }
-          // If local node exists and is a folder, keep local version (folders are structural)
         });
       }
 
@@ -297,13 +324,19 @@ function importEncrypted(file) {
         });
       });
       var mergeMsg = '✅ 导入成功！' + appData.subjects.length + '个学科，' + totalQ + '道题';
-      if (newSubjects > 0) mergeMsg += '（新增' + newSubjects + '个学科）';
-      if (newQuestions > 0) mergeMsg += '（新增' + newQuestions + '题）';
-      if (updatedQuestions > 0) mergeMsg += '（更新' + updatedQuestions + '题）';
+      if (newSubjects > 0) mergeMsg += '（+新增' + newSubjects + '个学科）';
+      if (newQuestions > 0) mergeMsg += '（+新增' + newQuestions + '题）';
+      if (updatedQuestions > 0) mergeMsg += '（~更新' + updatedQuestions + '题）';
+      if (deletedQuestions > 0) mergeMsg += '（-删除' + deletedQuestions + '题）';
+      if (deletedNodes > 0) mergeMsg += '（-移除' + deletedNodes + '个节点）';
       statusEl.textContent = mergeMsg + (extraInfo.length ? '，' + extraInfo.join('、') + '已恢复' : '');
       statusEl.style.color = 'var(--success)';
       document.getElementById('sync-import-file').value = '';
-      toast('导入成功：新增' + newQuestions + '题' + (updatedQuestions > 0 ? '，更新' + updatedQuestions + '题' : ''), 'success');
+      var toastMsg = '导入成功';
+      if (newQuestions > 0) toastMsg += '：+新增' + newQuestions + '题';
+      if (updatedQuestions > 0) toastMsg += '，~更新' + updatedQuestions + '题';
+      if (deletedQuestions > 0) toastMsg += '，-删除' + deletedQuestions + '题';
+      toast(toastMsg, 'success');
     }).catch(function (e) {
       statusEl.textContent = '❌ ' + e.message;
       statusEl.style.color = 'var(--danger)';

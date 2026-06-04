@@ -241,13 +241,13 @@
       </div>
     </div>
     <div class="mtab-content" id="mtab-file">
-        <p style="font-size:12px;color:var(--gray-500);margin-bottom:6px">支持 PDF、Word (.docx)、图片 (.png/.jpg)，自动提取文字后交给 AI 解析</p>
+        <p style="font-size:12px;color:var(--gray-500);margin-bottom:6px">支持 PDF、Word (.docx)、PPT (.pptx)、图片 (.png/.jpg)，自动提取文字后交给 AI 解析</p>
         <div class="file-drop-zone" id="file-drop-zone">
           <div class="file-drop-inner">
             <span style="font-size:28px">📁</span>
             <span style="font-size:13px;color:var(--gray-600)">拖拽文件到此处，或点击选择</span>
-            <span style="font-size:11px;color:var(--gray-400)">支持 PDF / Word / 图片</span>
-            <input type="file" id="import-file-input" accept=".pdf,.docx,.png,.jpg,.jpeg,.webp,.bmp" onchange="handleFileImport(this.files[0])" style="display:none">
+            <span style="font-size:11px;color:var(--gray-400)">支持 PDF / Word / PPT / 图片</span>
+            <input type="file" id="import-file-input" accept=".pdf,.docx,.pptx,.png,.jpg,.jpeg,.webp,.bmp" onchange="handleFileImport(this.files[0])" style="display:none">
             <button class="btn-outline btn-sm" onclick="document.getElementById('import-file-input').click()" style="margin-top:6px">选择文件</button>
           </div>
         </div>
@@ -370,7 +370,7 @@
           <ul>
             <li><strong>AI 智能解析</strong> — 在批量导入中粘贴任意格式题目文本，AI 自动提取</li>
             <li><strong>AI 对话</strong> — 右侧对话面板，可针对单题提问；⚡ 快速模式在对话面板中切换</li>
-            <li><strong>文件导入</strong> — 从 PDF/Word/图片中提取题目</li>
+            <li><strong>文件导入</strong> — 从 PDF/Word/PPT/图片中提取题目</li>
           </ul>
         </div>
       </div>
@@ -394,7 +394,7 @@
           <ul>
             <li><strong>文本解析</strong> — 粘贴题目文本，正则或 AI 智能解析</li>
             <li><strong>JSON 导入</strong> — 粘贴 JSON 数据，自动修复格式错误</li>
-            <li><strong>文件导入</strong> — 上传 PDF / Word / 图片，自动提取文字后 AI 解析</li>
+            <li><strong>文件导入</strong> — 上传 PDF / Word / PPT / 图片，自动提取文字后 AI 解析</li>
           </ul>
         </div>
       </div>

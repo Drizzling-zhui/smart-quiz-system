@@ -650,6 +650,13 @@ function _ensureFileLibs(fileType) {
       })
     );
   }
+  if (fileType === 'pptx' && !_fileLibsLoaded.jszip) {
+    promises.push(
+      _loadScript('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js').then(function () {
+        _fileLibsLoaded.jszip = true;
+      })
+    );
+  }
   return Promise.all(promises);
 }
 
@@ -666,7 +673,7 @@ function handleFileImport(file) {
   window._fileParsedQ = null;
 
   var ext = file.name.split('.').pop().toLowerCase();
-  var fileType = ext === 'pdf' ? 'pdf' : ext === 'docx' ? 'docx' : 'image';
+  var fileType = ext === 'pdf' ? 'pdf' : ext === 'docx' ? 'docx' : ext === 'pptx' ? 'pptx' : 'image';
 
   statusEl.style.display = 'block';
   statusEl.innerHTML = '<span style="color:var(--gray-600)">⏳ 正在加载解析库...</span>';
@@ -675,6 +682,7 @@ function handleFileImport(file) {
     statusEl.innerHTML = '<span style="color:var(--gray-600)">⏳ 正在提取文字...</span>';
     if (fileType === 'pdf') return _extractPDFText(file);
     if (fileType === 'docx') return _extractDOCXText(file);
+    if (fileType === 'pptx') return _extractPPTXText(file);
     return _extractImageText(file);
   }).then(function (text) {
     if (!text || !text.trim()) {
@@ -726,6 +734,46 @@ function _extractDOCXText(file) {
       mammoth.extractRawText({ arrayBuffer: reader.result }).then(function (result) {
         resolve(result.value);
       }).catch(function (e) { reject(e); });
+    };
+    reader.onerror = function () { reject(new Error('读取文件失败')); };
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+function _extractPPTXText(file) {
+  return new Promise(function (resolve, reject) {
+    var reader = new FileReader();
+    reader.onload = function () {
+      JSZip.loadAsync(reader.result).then(function (zip) {
+        // Find all slide files sorted by name
+        var slideFiles = Object.keys(zip.files).filter(function (name) {
+          return /^ppt\/slides\/slide\d+\.xml$/.test(name);
+        }).sort(function (a, b) {
+          var na = parseInt(a.match(/slide(\d+)/)[1]);
+          var nb = parseInt(b.match(/slide(\d+)/)[1]);
+          return na - nb;
+        });
+
+        if (!slideFiles.length) return resolve('');
+
+        var promises = slideFiles.map(function (name) {
+          return zip.file(name).async('string');
+        });
+
+        Promise.all(promises).then(function (xmlStrings) {
+          var allText = xmlStrings.map(function (xml) {
+            // Extract text from <a:t> elements
+            var texts = [];
+            var regex = /<a:t[^>]*>([^<]*)<\/a:t>/g;
+            var match;
+            while ((match = regex.exec(xml)) !== null) {
+              if (match[1].trim()) texts.push(match[1].trim());
+            }
+            return texts.join(' ');
+          }).filter(function (t) { return t; }).join('\n\n');
+          resolve(allText);
+        }).catch(reject);
+      }).catch(reject);
     };
     reader.onerror = function () { reject(new Error('读取文件失败')); };
     reader.readAsArrayBuffer(file);

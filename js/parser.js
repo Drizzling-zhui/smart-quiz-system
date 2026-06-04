@@ -660,6 +660,28 @@ function _ensureFileLibs(fileType) {
   return Promise.all(promises);
 }
 
+function _extractFileText(file) {
+  var ext = file.name.split('.').pop().toLowerCase();
+  var fileType = ext === 'pdf' ? 'pdf' : ext === 'docx' ? 'docx' : ext === 'pptx' ? 'pptx' :
+    ext === 'txt' ? 'text' : 'image';
+  if (fileType === 'text') return _readFileAsText(file);
+  return _ensureFileLibs(fileType).then(function () {
+    if (fileType === 'pdf') return _extractPDFText(file);
+    if (fileType === 'docx') return _extractDOCXText(file);
+    if (fileType === 'pptx') return _extractPPTXText(file);
+    return _extractImageText(file);
+  });
+}
+
+function _readFileAsText(file) {
+  return new Promise(function (resolve, reject) {
+    var reader = new FileReader();
+    reader.onload = function () { resolve(reader.result); };
+    reader.onerror = function () { reject(new Error('读取文件失败')); };
+    reader.readAsText(file);
+  });
+}
+
 function handleFileImport(file) {
   if (!file) return;
   var statusEl = document.getElementById('file-extract-status');
@@ -667,24 +689,14 @@ function handleFileImport(file) {
   var extractDiv = document.getElementById('file-extracted-text');
   var noAnswerBanner = document.getElementById('file-no-answer-banner');
   var previewDiv = document.getElementById('import-preview-file');
-  // Reset
   noAnswerBanner.style.display = 'none';
   previewDiv.innerHTML = '';
   window._fileParsedQ = null;
 
-  var ext = file.name.split('.').pop().toLowerCase();
-  var fileType = ext === 'pdf' ? 'pdf' : ext === 'docx' ? 'docx' : ext === 'pptx' ? 'pptx' : 'image';
-
   statusEl.style.display = 'block';
-  statusEl.innerHTML = '<span style="color:var(--gray-600)">⏳ 正在加载解析库...</span>';
+  statusEl.innerHTML = '<span style="color:var(--gray-600)">⏳ 正在提取文字...</span>';
 
-  _ensureFileLibs(fileType).then(function () {
-    statusEl.innerHTML = '<span style="color:var(--gray-600)">⏳ 正在提取文字...</span>';
-    if (fileType === 'pdf') return _extractPDFText(file);
-    if (fileType === 'docx') return _extractDOCXText(file);
-    if (fileType === 'pptx') return _extractPPTXText(file);
-    return _extractImageText(file);
-  }).then(function (text) {
+  _extractFileText(file).then(function (text) {
     if (!text || !text.trim()) {
       statusEl.innerHTML = '<span style="color:var(--error)">❌ 未能提取到文字内容</span>';
       return;
@@ -692,11 +704,31 @@ function handleFileImport(file) {
     statusEl.innerHTML = '<span style="color:var(--success)">✅ 成功提取 ' + text.length + ' 个字符</span>';
     textArea.value = text;
     extractDiv.style.display = 'block';
-    // Auto-scroll to extracted text
     extractDiv.scrollIntoView({ behavior: 'smooth' });
   }).catch(function (e) {
     statusEl.innerHTML = '<span style="color:var(--error)">❌ 提取失败：' + escHtml(e.message || '未知错误') + '</span>';
-    console.error('File extract error:', e);
+  });
+}
+
+function appendFileImport(file) {
+  if (!file) return;
+  var statusEl = document.getElementById('file-extract-status');
+  var textArea = document.getElementById('file-text-preview');
+
+  statusEl.style.display = 'block';
+  statusEl.innerHTML = '<span style="color:var(--gray-600)">⏳ 正在提取追加文件...</span>';
+
+  _extractFileText(file).then(function (text) {
+    if (!text || !text.trim()) {
+      statusEl.innerHTML = '<span style="color:var(--error)">❌ 未能提取到文字内容</span>';
+      return;
+    }
+    var existing = textArea.value;
+    textArea.value = (existing ? existing + '\n\n--- 追加文件: ' + file.name + ' ---\n\n' : '') + text;
+    statusEl.innerHTML = '<span style="color:var(--success)">✅ 已追加 ' + text.length + ' 个字符（总计 ' + textArea.value.length + ' 字符）</span>';
+    document.getElementById('import-file-append').value = '';
+  }).catch(function (e) {
+    statusEl.innerHTML = '<span style="color:var(--error)">❌ 提取失败：' + escHtml(e.message || '未知错误') + '</span>';
   });
 }
 

@@ -173,7 +173,7 @@ function _callAIParse(text, cfg, fileMode, opts) {
     '6. 解析(explanation) = 提取原文中的答案解析，没有则为空字符串""\n' +
     '7. 【极其重要】每道题必须包含 originalIndex 字段，值严格等于该题在原文中的题号数字（如原文"1."开头的题目，originalIndex必须为1；原文"二、"开头的题目，originalIndex必须为2）。原始题号是识别题目的唯一标识，绝对不能省略或填错！\n' +
     '8. 即使两道题题干看起来相似，只要题号不同就是不同的题目，必须全部解析输出，一条都不能少！\n' +
-    (fileMode ? '9. aiGenerated = 没有答案的题目设为true，有答案的设为false\n\n' : '\n');
+    (fileMode ? '9. 【文件导入特殊规则】如果原文中没有提供某道题的答案，请根据题目内容、选项和你的专业知识推理出最可能的正确答案填入answer字段，并将aiGenerated设为true。如果答案是从原文提取的，aiGenerated设为false。绝对不要留空answer字段，即使是推理的结果也要填入！\n\n' : '\n');
 
   if (expected > 0) {
     systemPrompt += '⚠️ 重要提醒：本段文本中应包含 ' + expected + ' 道题目';
@@ -241,7 +241,7 @@ function _callAIParse(text, cfg, fileMode, opts) {
       if (!q.options) q.options = [];
       if (!q.stats) q.stats = { attempts: 0, correct: 0, wrong: 0 };
       if (!q.answer) q.answer = '';
-      if (fileMode) q.aiGenerated = !q.answer;
+      if (fileMode && !q.aiGenerated) q.aiGenerated = !q.answer;
       var correctMatch = (q.answer || '').match(/正确答案[：:]\s*(.+)/);
       if (correctMatch) q.answer = correctMatch[1].trim();
       if ((q.type === 'choice' || q.type === 'judge') && q.options && q.options.length && q.answer) {
@@ -312,7 +312,7 @@ function _callAIParse(text, cfg, fileMode, opts) {
             if (!q.options) q.options = [];
             if (!q.stats) q.stats = { attempts: 0, correct: 0, wrong: 0 };
             if (!q.answer) q.answer = '';
-            if (fileMode) q.aiGenerated = !q.answer;
+            if (fileMode && !q.aiGenerated) q.aiGenerated = !q.answer;
             if ((q.type === 'choice' || q.type === 'judge') && q.options && q.options.length && q.answer) {
               var lm = q.answer.match(/[A-Da-d]/);
               if (lm) q.answer = lm[0].toUpperCase();

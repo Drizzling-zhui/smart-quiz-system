@@ -175,15 +175,3 @@ function renderImportPickerChildren(parentId, subject) {
   }).join('');
 }
 
-// ============================================================
-// IMPORT / EXPORT
-// ============================================================
-function exportData() {
-  var json = JSON.stringify(appData, null, 2);
-  var blob = new Blob([json], { type: 'application/json' });
-  var url = URL.createObjectURL(blob);
-  var a = document.createElement('a'); a.href = url;
-  a.download = '题库_' + new Date().toISOString().slice(0, 10) + '.json';
-  a.click(); URL.revokeObjectURL(url);
-  toast('导出成功', 'success');
-}

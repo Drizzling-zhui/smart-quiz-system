@@ -422,35 +422,3 @@ function updateDirDisplay() {
 }
 
 // Import data from a local JSON file (fallback for non-FSA browsers)
-function importFromLocalFile() {
-  var input = document.createElement('input');
-  input.type = 'file';
-  input.accept = '.json';
-  input.onchange = function () {
-    var file = input.files[0];
-    if (!file) return;
-    var reader = new FileReader();
-    reader.onload = function () {
-      try {
-        var data = JSON.parse(reader.result);
-        if (!data.subjects && !Array.isArray(data)) {
-          return toast('文件格式不正确，需要包含 subjects 字段', 'error');
-        }
-        // If it's an array of questions, let user pick target
-        if (Array.isArray(data)) {
-          return toast('请使用 JSON 导入功能导入题目数组', 'warning');
-        }
-        appData = data;
-        if (!appData.version) appData.version = '2.0';
-        saveData();
-        renderSidebar();
-        renderBrowse();
-        toast('已从本地文件加载数据（' + countAllQuestions(appData) + ' 题）', 'success');
-      } catch (e) {
-        toast('文件解析失败：' + e.message, 'error');
-      }
-    };
-    reader.readAsText(file);
-  };
-  input.click();
-}

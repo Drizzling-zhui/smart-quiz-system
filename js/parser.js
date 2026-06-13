@@ -137,6 +137,31 @@ function _countExpectedQuestions(text) {
 // Shared: call AI API and return parsed questions array
 // text: user text, cfg: API config, fileMode: if true, mark unanswered as aiGenerated
 // opts: { expectedCount, questionNumbers, isRetry }
+// Strip option text that the AI may have left trailing in the question body
+function _stripOptionsFromQuestion(q) {
+  if (!q.options || !q.options.length || !q.question) return;
+  q.options.forEach(function (opt) {
+    var patterns = [
+      opt.label + '.' + opt.text,
+      opt.label + '、' + opt.text,
+      opt.label + ' .' + opt.text,
+      opt.label + '、 ' + opt.text,
+      opt.label + '. ' + opt.text
+    ];
+    patterns.forEach(function (p) {
+      var idx = q.question.indexOf(p);
+      // Only strip if the option text appears near the end of the question
+      if (idx > 0 && idx + p.length >= q.question.length - 5) {
+        q.question = q.question.substring(0, idx).trim();
+      }
+    });
+  });
+  // Strip compact trailing option list: only if at least 2 option letters appear in sequence
+  // e.g. "A.优先级... B.进程... C.申请... D.单处理..."
+  q.question = q.question.replace(/\s*[A-D][.、][^A-D]+(?=[A-D][.、])[A-D][.、][^A-D]+\s*$/, '').trim();
+  q.question = q.question.replace(/\s*[A-D][.、][^A-D]+\s*$/g, '').trim();
+}
+
 function _callAIParse(text, cfg, fileMode, opts) {
   opts = opts || {};
   var expected = opts.expectedCount || 0;
@@ -151,7 +176,7 @@ function _callAIParse(text, cfg, fileMode, opts) {
 
   var systemPrompt = '你是一个专业的题目解析助手，从用户提供的文本中提取所有题目，返回JSON数组。\n\n' +
     '核心规则（严格遵守）：\n' +
-    '1. 题干(question) = 纯题目文字，不要把答案、选项、解析混入题干\n' +
+    '1. 题干(question) = 纯题目文字。注意：题干末尾不得附带选项文字（如"A.xxx B.xxx"）。如果原文中选项紧接题干（如"正确的是( )A.选项1 B.选项2"），必须将"A.选项1 B.选项2"从题干中切除，选项单独提取到options数组中。题干以问号或括号结尾即可。\n' +
     '2. 答案(answer) = 从文本中准确提取正确答案。选择题只保留字母(A/B/C/D)，多选题字母连写如"ABD"。判断题只写"正确"或"错误"。填空/简答写关键词语\n' +
     '3. 选项(options) = 仅选择题需要，每个选项{label, text}，文本完整提取\n' +
     '4. 如果原文同时出现"我的答案"和"正确答案"，以"正确答案"为准\n' +
@@ -240,6 +265,7 @@ function _callAIParse(text, cfg, fileMode, opts) {
       if ((!q.type || q.type === 'choice') && (q.answer === '正确' || q.answer === '错误')) {
         q.type = 'judge';
       }
+      _stripOptionsFromQuestion(q);
     });
 
     // Verify: if expected count is known and we got fewer, retry for missing ones
@@ -309,6 +335,7 @@ function _callAIParse(text, cfg, fileMode, opts) {
             if ((!q.type || q.type === 'choice') && (q.answer === '正确' || q.answer === '错误')) {
               q.type = 'judge';
             }
+            _stripOptionsFromQuestion(q);
           });
           // Merge: use originalIndex as primary identity, only dedup exact matches
           var existingIdx = {};

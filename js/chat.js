@@ -222,7 +222,6 @@ function sendChatMessage(text) {
   chatState.loading = true;
   window._chatReasoning = '';
   window._streamRAF = false;
-  window._streamLastRender = 0;
   renderChatMessages();
 
   var body = {
@@ -327,20 +326,12 @@ function updateStreamingContent(content) {
       streamEl.className = 'chat-msg assistant streaming';
       container.appendChild(streamEl);
     }
-    var now = Date.now();
-    var fullRender = !window._streamLastRender || (now - window._streamLastRender) > 500;
-    if (fullRender) {
-      // Periodic full markdown render (every 500ms)
-      window._streamLastRender = now;
-      var html = renderMD(window._streamContent);
-      if (window._chatReasoning) {
-        html = '<details class="reasoning-block" open><summary>thinking</summary>' + renderMD(window._chatReasoning) + '</details>' + html;
-      }
-      streamEl.innerHTML = html;
-    } else {
-      // Fast path: plain text update, no heavy regex
-      streamEl.textContent = window._streamContent;
+    // RAF throttles to max 60fps — renderMD is fine at this rate
+    var html = renderMD(window._streamContent);
+    if (window._chatReasoning) {
+      html = '<details class="reasoning-block" open><summary>thinking</summary>' + renderMD(window._chatReasoning) + '</details>' + html;
     }
+    streamEl.innerHTML = html;
     if (wasAtBottom) {
       container.scrollTop = container.scrollHeight;
     }

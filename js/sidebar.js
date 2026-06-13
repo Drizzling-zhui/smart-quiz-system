@@ -67,10 +67,7 @@ function renderTreeNode(node, subject, depth) {
     var children = getChildrenNodes(node.id, subject);
     if (children.length) {
       // Sort: folders first (A-Z), then files (A-Z)
-      children.sort(function (a, b) {
-        if (a.type !== b.type) return a.type === 'folder' ? -1 : 1;
-        return a.name.localeCompare(b.name, 'zh-CN');
-      });
+      children.sort(smartSortName);
       children.forEach(function (child) {
         html += renderTreeNode(child, subject, depth + 1);
       });

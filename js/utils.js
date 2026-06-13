@@ -103,3 +103,71 @@ function toast(msg, type) {
     setTimeout(function () { el.remove(); }, 300);
   }, 2800);
 }
+
+// Extract Chinese number from a string and return its integer value.
+// e.g. "第一章" → 1, "第十三章" → 13, "第二十五节" → 25, "操作系统" → null
+// Also handles Arabic numerals: "第3章" → 3
+function parseChineseNumber(str) {
+  if (!str || typeof str !== 'string') return null;
+
+  // Try Arabic numerals first: "第3章", "练习12", etc.
+  var arabicMatch = str.match(/(\d+)/);
+  if (arabicMatch) return parseInt(arabicMatch[1], 10);
+
+  // Collect consecutive Chinese digit characters
+  var cnDigits = '一二三四五六七八九十百';
+  var numStr = '';
+  for (var i = 0; i < str.length; i++) {
+    if (cnDigits.indexOf(str[i]) !== -1) {
+      numStr += str[i];
+    }
+  }
+  if (!numStr) return null;
+
+  // Convert Chinese number string to integer
+  var digits = { '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9 };
+
+  if (numStr === '十') return 10;
+  if (numStr === '百') return 100;
+
+  var val = 0;
+  if (numStr[0] === '十') {
+    // 十X = 10 + X (十三=13)
+    val = 10 + (digits[numStr[1]] || 0);
+  } else if (numStr[numStr.length - 1] === '十') {
+    // X十 = X * 10 (二十=20)
+    val = (digits[numStr[0]] || 0) * 10;
+  } else if (numStr.indexOf('十') !== -1) {
+    // X十Y = X * 10 + Y (二十五=25)
+    var parts = numStr.split('十');
+    val = (digits[parts[0]] || 0) * 10 + (digits[parts[1]] || 0);
+  } else {
+    // Single digit (五=5)
+    val = digits[numStr] || 0;
+  }
+
+  return val;
+}
+
+// Smart sort for tree nodes: folders first, then by Chinese/Arabic number, then localeCompare
+function smartSortName(a, b) {
+  // 1. Folders before files
+  if (a.type !== b.type) return a.type === 'folder' ? -1 : 1;
+
+  // 2. Try numeric sorting by Chinese/Arabic number in name
+  var numA = parseChineseNumber(a.name);
+  var numB = parseChineseNumber(b.name);
+
+  if (numA !== null && numB !== null) {
+    if (numA !== numB) return numA - numB;
+    // Same number, fallback to localeCompare
+    return a.name.localeCompare(b.name, 'zh-CN');
+  }
+
+  // 3. Items with numbers come before items without
+  if (numA !== null) return -1;
+  if (numB !== null) return 1;
+
+  // 4. No numbers in either — plain localeCompare
+  return a.name.localeCompare(b.name, 'zh-CN');
+}

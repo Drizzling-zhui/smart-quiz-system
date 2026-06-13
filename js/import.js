@@ -146,10 +146,7 @@ function renderImportPickerChildren(parentId, subject) {
     return '<div style="padding:4px 6px;font-size:11px;color:var(--gray-400)">空文件夹</div>';
   }
   // Sort: folders first, then files, A-Z
-  children.sort(function (a, b) {
-    if (a.type !== b.type) return a.type === 'folder' ? -1 : 1;
-    return a.name.localeCompare(b.name, 'zh-CN');
-  });
+  children.sort(smartSortName);
   return children.map(function (node) {
     if (node.type === 'folder') {
       var expanded = node.expanded !== false;

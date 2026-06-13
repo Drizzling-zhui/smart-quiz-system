@@ -77,6 +77,26 @@ function saveData() {
   if (typeof backupToFile === 'function') backupToFile();
 }
 
+// Remove aiGenerated flag from all questions across all subjects
+function clearAllAiGenerated() {
+  var count = 0;
+  (appData.subjects || []).forEach(function (s) {
+    (s.nodes || []).forEach(function (n) {
+      if (n.type === 'file' && n.questions) {
+        n.questions.forEach(function (q) {
+          if (q.aiGenerated) { delete q.aiGenerated; count++; }
+          if (q.aiConfidence) { delete q.aiConfidence; }
+          if (q.aiReasoning) { delete q.aiReasoning; }
+        });
+      }
+    });
+  });
+  saveData();
+  renderSidebar();
+  renderBrowse();
+  toast('已清除 ' + count + ' 道题目的 AI 标记', 'success');
+}
+
 function getSubject(name) {
   return appData.subjects.find(function (s) { return s.name === name; });
 }

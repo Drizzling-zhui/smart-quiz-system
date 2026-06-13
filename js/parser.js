@@ -102,22 +102,8 @@ function parseTextImport() {
   if (!text) return toast('请粘贴题目文本', 'warning');
   var result = parseQuizText(text);
   if (!result.questions.length) return toast('未能解析出题目', 'error');
-
-  var preview = document.getElementById('import-preview-text');
-  preview.innerHTML =
-    '<div style="margin:10px 0;padding:8px 14px;background:#f0fdf4;border-radius:6px;color:#166534;font-size:13px">' +
-      '✅ 解析出 ' + result.questions.length + ' 道题' +
-      '<button class="btn-primary btn-sm" style="margin-left:8px" onclick="importParsedQuestions()">确认导入</button>' +
-      '<button class="btn-outline btn-sm" style="margin-left:4px" onclick="document.getElementById(\'import-preview-text\').innerHTML=\'\'">取消</button>' +
-    '</div>' +
-    '<div class="preview-list">' + result.questions.map(function (q, i) {
-      var typeMap = { choice: '单选', multi: '多选', judge: '判断', fill: '填空', short: '简答' };
-      var typeLabel = typeMap[q.type] || q.type;
-      var qText = (q.question || '').slice(0, 50);
-      if ((q.question || '').length > 50) qText += '...';
-      return '<div class="pv-item"><span class="status">✅</span> #' + (i + 1) + ' [' + typeLabel + '] ' + escHtml(qText) + '</div>';
-    }).join('') + '</div>';
   window._parsedQ = result.questions;
+  _renderParsePreview('text', result.questions, null);
   toast('解析出 ' + result.questions.length + ' 道题', 'info');
 }
 
@@ -173,7 +159,7 @@ function _callAIParse(text, cfg, fileMode, opts) {
     '6. 解析(explanation) = 提取原文中的答案解析，没有则为空字符串""\n' +
     '7. 【极其重要】每道题必须包含 originalIndex 字段，值严格等于该题在原文中的题号数字（如原文"1."开头的题目，originalIndex必须为1；原文"二、"开头的题目，originalIndex必须为2）。原始题号是识别题目的唯一标识，绝对不能省略或填错！\n' +
     '8. 即使两道题题干看起来相似，只要题号不同就是不同的题目，必须全部解析输出，一条都不能少！\n' +
-    (fileMode ? '9. 【文件导入特殊规则】如果原文中没有提供某道题的答案，请根据题目内容、选项和你的专业知识推理出最可能的正确答案填入answer字段，并将aiGenerated设为true。如果答案是从原文提取的，aiGenerated设为false。绝对不要留空answer字段，即使是推理的结果也要填入！\n\n' : '\n');
+    '9. 如果原文中没有提供某道题的答案，请根据题目内容、选项和你的专业知识推理出最可能的正确答案填入answer字段，并将aiGenerated设为true。如果答案是从原文提取的，aiGenerated设为false。绝对不要留空answer字段，即使是推理的结果也要填入！\n\n';
 
   if (expected > 0) {
     systemPrompt += '⚠️ 重要提醒：本段文本中应包含 ' + expected + ' 道题目';
@@ -241,7 +227,7 @@ function _callAIParse(text, cfg, fileMode, opts) {
       if (!q.options) q.options = [];
       if (!q.stats) q.stats = { attempts: 0, correct: 0, wrong: 0 };
       if (!q.answer) q.answer = '';
-      if (fileMode && !q.aiGenerated) q.aiGenerated = !q.answer;
+      if (!q.aiGenerated) q.aiGenerated = !q.answer;
       var correctMatch = (q.answer || '').match(/正确答案[：:]\s*(.+)/);
       if (correctMatch) q.answer = correctMatch[1].trim();
       if ((q.type === 'choice' || q.type === 'judge') && q.options && q.options.length && q.answer) {
@@ -312,7 +298,7 @@ function _callAIParse(text, cfg, fileMode, opts) {
             if (!q.options) q.options = [];
             if (!q.stats) q.stats = { attempts: 0, correct: 0, wrong: 0 };
             if (!q.answer) q.answer = '';
-            if (fileMode && !q.aiGenerated) q.aiGenerated = !q.answer;
+            if (!q.aiGenerated) q.aiGenerated = !q.answer;
             if ((q.type === 'choice' || q.type === 'judge') && q.options && q.options.length && q.answer) {
               var lm = q.answer.match(/[A-Da-d]/);
               if (lm) q.answer = lm[0].toUpperCase();
@@ -591,23 +577,28 @@ function _renderParsePreview(mode, questions, fixResult) {
     var qText = (q.question || '').slice(0, 50);
     if ((q.question || '').length > 50) qText += '...';
     var badges = '';
-    if (mode === 'file') {
-      if (q.aiGenerated) badges += ' <span style="font-size:10px;background:#dbeafe;color:#1e40af;padding:1px 5px;border-radius:3px">AI答案</span>';
-      if (!q.answer) badges += ' <span style="font-size:10px;background:#fef3c7;color:#92400e;padding:1px 5px;border-radius:3px">无答案</span>';
-    }
+    if (q.aiGenerated) badges += ' <span style="font-size:10px;background:#dbeafe;color:#1e40af;padding:1px 5px;border-radius:3px">AI答案</span>';
+    if (!q.answer) badges += ' <span style="font-size:10px;background:#fef3c7;color:#92400e;padding:1px 5px;border-radius:3px">无答案</span>';
     html += '<div class="pv-item"><span class="status">✅</span> #' + (i + 1) + ' [' + typeLabel + '] ' + escHtml(qText) + badges + '</div>';
   });
   html += '</div>';
   previewEl.innerHTML = html;
 
-  if (mode === 'file') {
-    if (withoutAnswer > 0) {
-      var banner = document.getElementById('file-no-answer-banner');
-      if (banner) { banner.style.display = 'block'; banner.querySelector('span').textContent = '⚠️ ' + withoutAnswer + ' 道题目没有答案，可以尝试'; }
-    } else {
-      var b = document.getElementById('file-no-answer-banner');
-      if (b) b.style.display = 'none';
+  if (withoutAnswer > 0) {
+    var banner = document.getElementById(mode === 'file' ? 'file-no-answer-banner' : 'text-no-answer-banner');
+    if (banner) {
+      banner.style.display = 'block';
+      var span = banner.querySelector('span');
+      if (span) span.textContent = '⏳ 正在为 ' + withoutAnswer + ' 道题目自动生成答案...';
     }
+    // Auto-generate answers (guarded against recursive re-trigger)
+    if (!window._autoGenInProgress && typeof hasApiConfigured === 'function' && hasApiConfigured()) {
+      window._autoGenInProgress = true;
+      aiGenerateAnswers();
+    }
+  } else {
+    var b2 = document.getElementById(mode === 'file' ? 'file-no-answer-banner' : 'text-no-answer-banner');
+    if (b2) b2.style.display = 'none';
   }
 }
 
@@ -994,18 +985,23 @@ function importParsedQuestionsToFile() {
   showImportPicker(doImport);
 }
 
-// AI generate answers for questions without answers
+// AI generate answers for questions without answers (works for both text and file import)
 function aiGenerateAnswers() {
-  if (!window._fileParsedQ || !window._fileParsedQ.length) return toast('没有待处理的题目', 'warning');
-  var noAnswer = window._fileParsedQ.filter(function (q) { return !q.answer; });
+  // Auto-detect mode: file mode takes priority if _fileParsedQ is active
+  var isFileMode = !!(window._fileParsedQ && window._fileParsedQ.length);
+  var questions = isFileMode ? window._fileParsedQ : window._parsedQ;
+  if (!questions || !questions.length) return toast('没有待处理的题目', 'warning');
+
+  var noAnswer = questions.filter(function (q) { return !q.answer; });
   if (!noAnswer.length) {
-    document.getElementById('file-no-answer-banner').style.display = 'none';
+    var banner = document.getElementById(isFileMode ? 'file-no-answer-banner' : 'text-no-answer-banner');
+    if (banner) banner.style.display = 'none';
     return toast('所有题目都有答案', 'info');
   }
   if (!hasApiConfigured()) return toast('请先在设置中配置 API', 'warning');
 
-  var btn = document.getElementById('btn-ai-gen-answers');
-  btn.textContent = '⏳ 生成中...'; btn.disabled = true;
+  var btn = document.getElementById(isFileMode ? 'btn-ai-gen-answers' : 'btn-ai-gen-answers-text');
+  if (btn) { btn.textContent = '⏳ 生成中...'; btn.disabled = true; }
 
   var cfg = getApiConfig();
   var systemPrompt = '你是一个专业的题目解答助手。用户会提供几道没有答案的题目（JSON格式），请你为每道题生成答案。\n\n' +
@@ -1069,45 +1065,21 @@ function aiGenerateAnswers() {
       }
     });
 
-    // Refresh preview
-    var preview = document.getElementById('import-preview-file');
-    var questions = window._fileParsedQ;
-    var withoutAnswer = questions.filter(function (q) { return !q.answer; }).length;
-    var previewHtml = '<div style="margin:10px 0;padding:8px 14px;background:#f0fdf4;border-radius:6px;color:#166534;font-size:13px">';
-    previewHtml += '✅ AI解析出 ' + questions.length + ' 道题';
-    if (withoutAnswer > 0) {
-      previewHtml += ' <span style="color:#d97706">（' + withoutAnswer + ' 道未找到答案）</span>';
-    } else {
-      previewHtml += ' <span style="color:var(--success)">（全部有答案）</span>';
-    }
-    previewHtml += '<button class="btn-primary btn-sm" style="margin-left:8px" onclick="importFileParsedQuestions()">确认导入</button>';
-    previewHtml += '<button class="btn-outline btn-sm" style="margin-left:4px" onclick="document.getElementById(\'import-preview-file\').innerHTML=\'\'">取消</button>';
-    previewHtml += '</div><div class="preview-list">';
-    questions.forEach(function (q, i) {
-      var typeMap2 = { choice: '单选', multi: '多选', judge: '判断', fill: '填空', short: '简答' };
-      var typeLabel = typeMap2[q.type] || q.type;
-      var qText = (q.question || '').slice(0, 50);
-      if ((q.question || '').length > 50) qText += '...';
-      var aiBadge = '';
-      if (q.aiGenerated) {
-        var confColor = q.aiConfidence === 'low' ? '#fef2f2;color:#991b1b' : (q.aiConfidence === 'high' ? '#f0fdf4;color:#166534' : '#fefce8;color:#854d0e');
-        var confLabel = q.aiConfidence === 'low' ? 'AI答案⚠' : 'AI答案';
-        aiBadge = ' <span style="font-size:10px;background:' + confColor.split(';')[0] + ';color:' + confColor.split(';')[1] + ';padding:1px 5px;border-radius:3px">' + confLabel + '</span>';
-      }
-      var noAnsBadge = !q.answer ? ' <span style="font-size:10px;background:#fef3c7;color:#92400e;padding:1px 5px;border-radius:3px">无答案</span>' : '';
-      previewHtml += '<div class="pv-item"><span class="status">✅</span> #' + (i + 1) + ' [' + typeLabel + '] ' + escHtml(qText) + aiBadge + noAnsBadge + '</div>';
-    });
-    previewHtml += '</div>';
-    preview.innerHTML = previewHtml;
+    // Refresh preview using shared render function
+    _renderParsePreview(isFileMode ? 'file' : 'text', questions, null);
 
+    var withoutAnswer = questions.filter(function (q) { return !q.answer; }).length;
     if (withoutAnswer === 0) {
-      document.getElementById('file-no-answer-banner').style.display = 'none';
+      var banner2 = document.getElementById(isFileMode ? 'file-no-answer-banner' : 'text-no-answer-banner');
+      if (banner2) banner2.style.display = 'none';
     }
     toast('AI已为 ' + filled + ' 道题生成答案（仅供参考，请核对）', 'success');
   }).catch(function (e) {
     toast('AI生成答案失败：' + e.message, 'error');
   }).finally(function () {
-    btn.textContent = 'AI 生成答案'; btn.disabled = false;
+    window._autoGenInProgress = false;
+    var btn2 = document.getElementById(isFileMode ? 'btn-ai-gen-answers' : 'btn-ai-gen-answers-text');
+    if (btn2) { btn2.textContent = 'AI 生成答案'; btn2.disabled = false; }
   });
 }
 

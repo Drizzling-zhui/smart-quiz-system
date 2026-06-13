@@ -9,6 +9,7 @@ data/subjects/*.json
 data/subjects/**/*.json
 data/_data.json
 subjects/
+js/capacitor.js
 *.enc
 node_modules/
 android/

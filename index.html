@@ -232,6 +232,11 @@
           <button class="btn-outline" onclick="document.getElementById('import-text').value=''">清空</button>
         </div>
         <div id="import-preview-text"></div>
+        <div id="text-no-answer-banner" style="display:none;margin-top:8px;padding:8px 12px;background:#fffbeb;border:1px solid #fde68a;border-radius:6px;font-size:12px;color:#92400e">
+          <span>⚠️ 检测到部分题目没有答案，可以尝试</span>
+          <button class="btn-ai btn-sm" onclick="aiGenerateAnswers()" id="btn-ai-gen-answers-text">AI 生成答案</button>
+          <span style="font-size:11px;color:var(--gray-500)">（AI生成的答案仅供参考，不一定准确）</span>
+        </div>
       <div class="import-help">
         <strong>📖 格式说明</strong><br>
         <code>{ "subjects": [{ "name": "学科", "questions": [{ "type":"choice|multi|judge|fill|short", "question":"题干", "options": [{"label":"A","text":"选项"}], "answer":"A", "explanation":"解析" }] }] }</code>
@@ -455,6 +460,14 @@
         · 外部编辑本地 JSON 后，点击「一键同步」立即更新<br>
         · 数据仅存储在本地，不上传任何服务器
       </p>
+      <hr style="margin:16px 0;border-color:var(--gray-200)">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+        <div>
+          <strong style="font-size:13px">🧹 清除 AI 标记</strong>
+          <p style="font-size:11px;color:var(--gray-400);margin:2px 0 0 0">核对答案后，一键移除所有题目的「AI答案」标签</p>
+        </div>
+        <button onclick="confirmAction('确定清除所有题目的 AI 生成标记吗？\n（答案内容保留，仅移除「AI答案」标签）', clearAllAiGenerated)" style="white-space:nowrap;padding:4px 10px;font-size:12px;border:1px solid var(--gray-300);border-radius:4px;background:#fff;cursor:pointer">清除 AI 标记</button>
+      </div>
     </div>
 
     <div class="modal-actions">

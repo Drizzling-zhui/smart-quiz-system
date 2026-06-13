@@ -1,6 +1,6 @@
 {
   "name": "quiz-app",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "纯前端单页应用，用于管理和练习题库。支持学科管理、题库浏览、答题训练、多种格式导入导出，以及本地文件夹双向同步。",
   "main": "index.js",
   "scripts": {

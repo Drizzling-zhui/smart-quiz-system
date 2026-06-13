@@ -132,15 +132,18 @@ function pickDataDirectory() {
     if (result === 'restored') return;
     // Need to pick a new directory
     return window.showDirectoryPicker({ mode: 'readwrite' }).then(function (handle) {
-      localDirHandle = handle;
-      localSyncEnabled = true;
-      localDirName = handle.name;
-      try { localStorage.setItem(LOCAL_DIR_NAME_KEY, handle.name); } catch (e) {}
-      return _setStoredHandle(handle).then(function () {
-        updateSyncIndicator();
-        updateDirDisplay();
-        toast('已绑定本地文件夹，数据将自动同步', 'success');
-        backupToFile();
+      // Validate: check if this looks like a subject subdirectory
+      return _validateSyncRoot(handle).then(function () {
+        localDirHandle = handle;
+        localSyncEnabled = true;
+        localDirName = handle.name;
+        try { localStorage.setItem(LOCAL_DIR_NAME_KEY, handle.name); } catch (e) {}
+        return _setStoredHandle(handle).then(function () {
+          updateSyncIndicator();
+          updateDirDisplay();
+          toast('已绑定本地文件夹，数据将自动同步', 'success');
+          backupToFile();
+        });
       });
     });
   }).catch(function (e) {
@@ -158,6 +161,39 @@ function releaseDataDirectory() {
     updateSyncIndicator();
     updateDirDisplay();
     toast('已解除本地文件夹绑定', 'info');
+  });
+}
+
+// Validate that the picked directory is not a subject subdirectory to prevent
+// cross-contamination: if _data.json is written inside a subject folder, tree
+// sync will nest all subjects under that folder.
+function _validateSyncRoot(dirHandle) {
+  // Check 1: if directory already has _data.json, it's an existing sync root
+  return dirHandle.getFileHandle('_data.json').then(function () {
+    // _data.json exists — this is a valid existing root
+    return true;
+  }).catch(function () {
+    // No _data.json — new directory, check if name matches a subject
+    var dirName = dirHandle.name;
+    var subjects = (appData && appData.subjects) ? appData.subjects : [];
+    var match = subjects.some(function (s) { return s.name === dirName; });
+    if (match) {
+      return new Promise(function (resolve, reject) {
+        var confirmed = confirm(
+          '⚠️ 目录名「' + dirName + '」与学科同名，可能是学科子目录而非同步根目录。\n\n' +
+          '如果绑定此目录，数据将嵌套写入，导致本地文件结构混乱。\n\n' +
+          '建议选择上级目录（包含所有学科的目录）。\n\n' +
+          '确定仍要绑定此目录吗？'
+        );
+        if (confirmed) {
+          resolve(true);
+        } else {
+          reject(new Error('AbortError'));
+        }
+      });
+    }
+    // Not a subject name, proceed normally
+    return true;
   });
 }
 

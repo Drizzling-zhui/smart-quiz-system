@@ -73,16 +73,23 @@ function loadData() {
 }
 
 var _saveDebounceTimer = null;
-function saveData() {
-  // Debounce: rapid successive calls only write once (300ms)
+function saveData(immediate) {
+  if (immediate) {
+    if (_saveDebounceTimer) { clearTimeout(_saveDebounceTimer); _saveDebounceTimer = null; }
+    _doSave();
+    return;
+  }
   if (_saveDebounceTimer) clearTimeout(_saveDebounceTimer);
-  _saveDebounceTimer = setTimeout(function () {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(appData, null, 2)); } catch (e) {}
-    // Skip local file sync on mobile/Capacitor — tablet has no local folder binding
-    if (typeof backupToFile === 'function' && !(typeof Capacitor !== 'undefined' && Capacitor.isNativePlatform && Capacitor.isNativePlatform())) {
-      backupToFile();
-    }
-  }, 300);
+  _saveDebounceTimer = setTimeout(_doSave, 300);
+}
+
+function _doSave() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(appData, null, 2)); } catch (e) {
+    console.warn('saveData failed:', e);
+  }
+  if (typeof backupToFile === 'function' && !(typeof Capacitor !== 'undefined' && Capacitor.isNativePlatform && Capacitor.isNativePlatform())) {
+    backupToFile();
+  }
 }
 
 // Remove aiGenerated flag from all questions across all subjects

@@ -586,7 +586,7 @@ function submitQuizAnswer() {
   else { q.stats.wrong++; sub.correct = false; }
 
   sub.attempts++;
-  saveData();
+  saveData(true);
   saveQuizResume();
   renderSidebar();
   renderQuizQuestion();
@@ -603,7 +603,7 @@ function submitDunno() {
   if (!q.stats) q.stats = { attempts: 0, correct: 0, wrong: 0 };
   q.stats.attempts++;
   q.stats.wrong++;
-  saveData();
+  saveData(true);
   saveQuizResume();
   renderSidebar();
   renderQuizQuestion();
@@ -767,8 +767,10 @@ var _pendingResumeData = null;
 
 function saveQuizResume() {
   if (!quizState.started || !quizState.questions.length) return;
+  // Only save question IDs, not full objects — avoids stale copies on resume
+  var qIds = quizState.questions.map(function (q) { return q.id; });
   var data = {
-    questions: quizState.questions,
+    qIds: qIds,
     currentIdx: quizState.currentIdx,
     submitted: quizState.submitted,
     mode: quizState.mode,
@@ -789,13 +791,14 @@ function checkQuizResume() {
     var raw = localStorage.getItem('quiz_resume');
     if (!raw) return;
     var data = JSON.parse(raw);
-    if (!data || !data.questions || !data.questions.length) { clearQuizResume(); return; }
+    var totalQ = (data.qIds || data.questions || []).length;
+    if (!totalQ) { clearQuizResume(); return; }
     var hasProgress = data.submitted && data.submitted.some(function (s) { return s.attempts > 0 || s.userAnswer; });
     if (!hasProgress && data.currentIdx === 0) { clearQuizResume(); return; }
     _pendingResumeData = data;
     var answered = data.submitted ? data.submitted.filter(function (s) { return s.attempts > 0; }).length : 0;
     document.getElementById('resume-info').textContent =
-      '您有未完成的答题：共 ' + data.questions.length + ' 题，已答 ' + answered + ' 题，当前第 ' + (data.currentIdx + 1) + ' 题。是否继续？';
+      '您有未完成的答题：共 ' + totalQ + ' 题，已答 ' + answered + ' 题，当前第 ' + (data.currentIdx + 1) + ' 题。是否继续？';
     document.getElementById('modal-quiz-resume').classList.add('active');
   } catch (e) { clearQuizResume(); }
 }
@@ -812,7 +815,24 @@ function resumeQuiz() {
   if (!data) return;
 
   quizState.mode = data.mode || 'sequential';
-  quizState.questions = data.questions;
+  // Reconstruct questions from appData using saved IDs (not saved copies)
+  quizState.questions = [];
+  if (data.qIds) {
+    data.qIds.forEach(function (id) {
+      var q = findQuestionById(id);
+      if (q) quizState.questions.push(q);
+    });
+  } else if (data.questions) {
+    // Backward compat: old format saved full objects, try to find originals
+    data.questions.forEach(function (savedQ) {
+      var q = findQuestionById(savedQ.id);
+      if (q) quizState.questions.push(q);
+    });
+  }
+  // If no questions reconstructed, fall back to saved copies
+  if (!quizState.questions.length && data.questions) {
+    quizState.questions = data.questions;
+  }
   quizState.currentIdx = data.currentIdx;
   quizState.submitted = data.submitted;
   quizState.started = true;

@@ -221,6 +221,8 @@ function sendChatMessage(text) {
 
   chatState.loading = true;
   window._chatReasoning = '';
+  window._streamRAF = false;
+  window._streamLastRender = 0;
   renderChatMessages();
 
   var body = {
@@ -307,27 +309,42 @@ function isChatAtBottom() {
 }
 
 function updateStreamingContent(content) {
-  var container = document.getElementById('chat-messages');
-  var wasAtBottom = isChatAtBottom();
-  // Remove the loading dots placeholder
-  var loadingEl = container.querySelector('.chat-msg.loading');
-  if (loadingEl) loadingEl.remove();
-  // Update or create streaming element
-  var streamEl = container.querySelector('.chat-msg.streaming');
-  if (!streamEl) {
-    streamEl = document.createElement('div');
-    streamEl.className = 'chat-msg assistant streaming';
-    container.appendChild(streamEl);
-  }
-  var html = renderMD(content);
-  // Show reasoning in a collapsible block if present
-  if (window._chatReasoning) {
-    html = '<details class="reasoning-block" open><summary>💭 思考过程</summary>' + renderMD(window._chatReasoning) + '</details>' + html;
-  }
-  streamEl.innerHTML = html;
-  if (wasAtBottom) {
-    container.scrollTop = container.scrollHeight;
-  }
+  // Store latest content for batched rendering
+  window._streamContent = content;
+  if (window._streamRAF) return; // RAF already scheduled
+  window._streamRAF = true;
+  requestAnimationFrame(function () {
+    window._streamRAF = false;
+    var container = document.getElementById('chat-messages');
+    var wasAtBottom = isChatAtBottom();
+    // Remove the loading dots placeholder
+    var loadingEl = container.querySelector('.chat-msg.loading');
+    if (loadingEl) loadingEl.remove();
+    // Update or create streaming element
+    var streamEl = container.querySelector('.chat-msg.streaming');
+    if (!streamEl) {
+      streamEl = document.createElement('div');
+      streamEl.className = 'chat-msg assistant streaming';
+      container.appendChild(streamEl);
+    }
+    var now = Date.now();
+    var fullRender = !window._streamLastRender || (now - window._streamLastRender) > 500;
+    if (fullRender) {
+      // Periodic full markdown render (every 500ms)
+      window._streamLastRender = now;
+      var html = renderMD(window._streamContent);
+      if (window._chatReasoning) {
+        html = '<details class="reasoning-block" open><summary>thinking</summary>' + renderMD(window._chatReasoning) + '</details>' + html;
+      }
+      streamEl.innerHTML = html;
+    } else {
+      // Fast path: plain text update, no heavy regex
+      streamEl.textContent = window._streamContent;
+    }
+    if (wasAtBottom) {
+      container.scrollTop = container.scrollHeight;
+    }
+  });
 }
 
 function renderChatMessages() {

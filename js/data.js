@@ -72,9 +72,17 @@ function loadData() {
   loadFavorites();
 }
 
+var _saveDebounceTimer = null;
 function saveData() {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(appData, null, 2)); } catch (e) {}
-  if (typeof backupToFile === 'function') backupToFile();
+  // Debounce: rapid successive calls only write once (300ms)
+  if (_saveDebounceTimer) clearTimeout(_saveDebounceTimer);
+  _saveDebounceTimer = setTimeout(function () {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(appData, null, 2)); } catch (e) {}
+    // Skip local file sync on mobile/Capacitor — tablet has no local folder binding
+    if (typeof backupToFile === 'function' && !(typeof Capacitor !== 'undefined' && Capacitor.isNativePlatform && Capacitor.isNativePlatform())) {
+      backupToFile();
+    }
+  }, 300);
 }
 
 // Remove aiGenerated flag from all questions across all subjects
